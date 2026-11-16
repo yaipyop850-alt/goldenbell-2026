@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도전! 골든벨</title>
+<style>
+  :root{
+    --bg:#0f1a2e; --panel:#16243f; --line:#2a3b5e; --text:#f3f5fa; --muted:#9fb0cf;
+    --gold:#f2c14e; --gold-d:#c9971f; --red:#ff6b6b; --green:#4cd39a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:"Malgun Gothic","맑은 고딕","Noto Sans KR","Noto Sans CJK KR",sans-serif}
+  body{display:flex;flex-direction:column}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--line)}
+  .brand{font-weight:800;font-size:22px;letter-spacing:.02em}
+  .brand span{color:var(--gold)}
+  .hbtn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:15px;cursor:pointer;font-family:inherit}
+  .hbtn:hover{color:var(--text);border-color:var(--muted)}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 6vw;text-align:center;gap:28px}
+  .meta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .tag{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 16px;font-size:clamp(14px,1.6vw,20px);color:var(--muted)}
+  .tag.ox{color:var(--gold);border-color:var(--gold-d)}
+  .qno{font-size:clamp(28px,3.4vw,46px);font-weight:800;color:var(--gold)}
+  .question{font-size:clamp(30px,4.4vw,64px);font-weight:700;line-height:1.45;max-width:1400px;word-break:keep-all}
+  .stage{min-height:clamp(160px,24vh,300px);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+  .ring{position:relative;width:clamp(150px,20vh,240px);height:clamp(150px,20vh,240px)}
+  .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .ring .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(60px,9vh,110px);font-weight:800}
+  .ring.low .num{color:var(--red)}
+  .call{font-size:clamp(40px,6.5vw,96px);font-weight:900;color:var(--gold);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{transform:scale(1.05)}}
+  .answer{font-size:clamp(28px,3vw,40px);color:var(--muted)}
+  .answer b{display:block;font-size:clamp(90px,14vh,170px);line-height:1.1;color:var(--green)}
+  .expl{font-size:clamp(24px,3vw,42px);font-weight:600;word-break:keep-all}
+  .speaking{color:var(--muted);font-size:20px;display:flex;align-items:center;gap:10px}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--gold);animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.25}}
+  footer{display:flex;align-items:center;justify-content:center;gap:14px;padding:18px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .main-btn{background:var(--gold);color:#1a1405;border:none;border-radius:14px;padding:16px 40px;font-size:24px;font-weight:800;cursor:pointer;font-family:inherit;min-width:300px}
+  .main-btn:hover{background:#ffd56e}
+  .main-btn:disabled{background:#3a4a6a;color:#8796b4;cursor:default}
+  .sub-btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:16px 22px;font-size:18px;cursor:pointer;font-family:inherit}
+  .keys{color:var(--muted);font-size:14px;width:100%;text-align:center}
+  kbd{border:1px solid var(--line);border-radius:5px;padding:1px 6px;background:var(--panel);font-family:inherit}
+  /* settings */
+  .overlay{position:fixed;inset:0;background:rgba(5,10,20,.7);display:none;align-items:center;justify-content:center;z-index:10}
+  .overlay.open{display:flex}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px 28px;width:min(560px,92vw);text-align:left}
+  .sheet h2{margin:0 0 18px;font-size:22px}
+  .row{margin-bottom:18px}
+  .row label{display:flex;justify-content:space-between;color:var(--muted);font-size:15px;margin-bottom:8px}
+  select,input[type=range],input[type=number]{width:100%;font-size:16px;font-family:inherit}
+  select,input[type=number]{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px}
+  input[type=range]{accent-color:var(--gold)}
+  .warn{background:#3b2a12;border:1px solid var(--gold-d);color:#ffe2a3;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:16px;display:none}
+  .sheet.wide{width:min(960px,94vw)}
+  textarea{width:100%;height:150px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;font-family:inherit;resize:vertical}
+  .hint{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 10px}
+  .ptable-wrap{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:12px}
+  table.pt{width:100%;border-collapse:collapse;font-size:14px}
+  .pt th,.pt td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .pt th{position:sticky;top:0;background:#1d2e4f;color:var(--muted);font-weight:600}
+  .pt td.err{color:var(--red)}
+  .pstatus{margin-top:10px;font-size:15px;color:var(--muted)}
+  .pstatus b{color:var(--gold)}
+  .qcount{color:var(--muted);font-size:16px;font-weight:500;margin-left:8px}
+  .sheet-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">도전! <span>골든벨</span> <small id="srcInfo" style="color:var(--muted);font-weight:500;font-size:14px"></small></div>
+  <div style="display:flex;gap:8px">
+    <button class="hbtn" id="openImport">📋 문항 등록</button>
+    <button class="hbtn" id="openSettings">⚙ 소리 설정</button>
+  </div>
+</header>
+
+<main>
+  <div>
+    <div class="qno" id="qno">1번 문제</div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <div class="question" id="question" style="visibility:hidden"></div>
+  <div class="stage" id="stage"></div>
+</main>
+
+<footer>
+  <button class="sub-btn" id="replayBtn" title="R">↻ 다시 읽기</button>
+  <button class="sub-btn" id="manualBtn" title="M">🎤 직접 읽기 · 카운트만</button>
+  <button class="main-btn" id="mainBtn">▶ AI가 문제 읽기</button>
+  <button class="sub-btn" id="resetBtn" title="Esc">⟲ 처음으로</button>
+  <div class="keys"><kbd>Space</kbd> / <kbd>→</kbd> / 프레젠터 버튼: 다음 단계 · <kbd>M</kbd>: 직접 읽기(카운트만) · <kbd>R</kbd>: 다시 읽기 · <kbd>Esc</kbd>: 처음으로</div>
+</footer>
+
+<div class="overlay" id="settings">
+  <div class="sheet">
+    <h2>소리 설정</h2>
+    <div class="warn" id="voiceWarn"></div>
+    <div class="row">
+      <label>목소리 <span id="voiceCount"></span></label>
+      <select id="voiceSel"></select>
+    </div>
+    <div class="row">
+      <label>읽기 속도 <span id="rateV"></span></label>
+      <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.9">
+    </div>
+    <div class="row">
+      <label>목소리 높낮이 <span id="pitchV"></span></label>
+      <input type="range" id="pitch" min="0.6" max="1.4" step="0.05" value="1">
+    </div>
+    <div class="row">
+      <label>카운트다운 비프음 크기 <span id="beepV"></span></label>
+      <input type="range" id="beepVol" min="0" max="1" step="0.05" value="0.6">
+    </div>
+    <div class="row">
+      <label>답 쓰는 시간 (초)</label>
+      <input type="number" id="secs" min="3" max="60" value="10">
+    </div>
+    <div class="sheet-actions">
+      <button class="sub-btn" id="beepTestBtn">♪ 비프음 듣기</button>
+      <button class="sub-btn" id="previewBtn">🔊 목소리 듣기</button>
+      <button class="main-btn" style="min-width:0;padding:14px 26px;font-size:18px" id="closeSettings">완료</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="importer">
+  <div class="sheet wide">
+    <h2>문항 등록 — 엑셀 표 붙여넣기</h2>
+    <p class="hint">엑셀에서 <b>과목 · 분야 · 문제 · 정답</b> 열을 머리글 행까지 함께 복사해 붙여넣으세요. (해설 열이 따로 있으면 함께 복사해도 됩니다)<br>
+    · 문제 앞의 <b>(O, X)</b> 표시는 자동으로 OX 문제로 인식합니다.<br>
+    · 정답 칸의 괄호 안 내용 — 예: <b>X (2026년 최저시급은 10,320원)</b> — 은 해설로 분리합니다.</p>
+    <textarea id="pasteArea" placeholder="여기에 붙여넣기 (Ctrl+V)"></textarea>
+    <div class="pstatus" id="pStatus">붙여넣으면 아래에 미리보기가 나타납니다.</div>
+    <div class="ptable-wrap" id="pWrap" style="display:none"><table class="pt" id="pTable"></table></div>
+    <div class="sheet-actions" style="margin-top:16px">
+      <button class="sub-btn" id="cancelImport">취소</button>
+      <button class="main-btn" style="min-width:0;padding:14px 26px;font-size:18px" id="doImport" disabled>등록하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- 문항 데이터 ---------- */
+const SAMPLE = [
+  {
+    subject: "일반사회", field: "상식", type: "OX",
+    question: "2026년 최저시급은 10,230원이다.",
+    answer: "X",
+    explanation: "2026년 최저시급은 10,320원입니다."
+  }
+];
+
+// 문항 우선순위: ① 저장소의 questions.tsv 파일 → ② 이 브라우저에 붙여넣은 문항 → ③ 예시 문항
+let QUESTIONS = SAMPLE, SOURCE = "예시 문항";
+try{ const saved = JSON.parse(localStorage.getItem("gb_questions")||"null"); if (Array.isArray(saved) && saved.length){ QUESTIONS = saved; SOURCE = "붙여넣은 문항"; } }catch(e){}
+async function loadQuestionFile(){
+  try{
+    const res = await fetch("questions.tsv?v=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const list = buildQuestions(parseTSV(await res.text())).filter(q => !q.errs.length).map(({errs,...q})=>q);
+    if (list.length){ QUESTIONS = list; SOURCE = "문항 파일"; if (state === "idle"){ qi = 0; goIdle(); } }
+  }catch(e){}
+  showSource();
+}
+function showSource(){ const el = document.getElementById("srcInfo"); if (el) el.textContent = `${SOURCE} · ${QUESTIONS.length}문항`; }
+
+/* ---------- 상태 ---------- */
+// idle → reading → countdown → call(정답판 대기) → reveal
+let qi = 0, state = "idle", timer = null, remain = 0, lastSpeech = "";
+const $ = id => document.getElementById(id);
+const S = { voice: null, rate: 0.9, pitch: 1, secs: 10, beep: 0.6 };
+
+/* ---------- 설정 저장(브라우저별) ---------- */
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep}); S.voiceName = p.voiceName; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,voiceName:S.voice&&S.voice.name})); }catch(e){} }
+
+/* ---------- 음성 ---------- */
+const synth = window.speechSynthesis;
+let voices = [], currentUtter = null;
+
+function rankVoice(v){
+  let s = 0;
+  if (/natural/i.test(v.name)) s += 10;   // Edge 고품질 음성
+  if (/sunhi/i.test(v.name)) s += 3;
+  if (/online/i.test(v.name)) s += 1;
+  return s;
+}
+function loadVoices(){
+  if (!synth) return;
+  voices = synth.getVoices().filter(v => /^ko/i.test(v.lang)).sort((a,b)=>rankVoice(b)-rankVoice(a));
+  const sel = $("voiceSel"); sel.innerHTML = "";
+  voices.forEach((v,i)=>{
+    const o = document.createElement("option");
+    o.value = i;
+    o.textContent = v.name.replace(/ - Korean \(Korea\)/,"") + (/natural/i.test(v.name) ? "  ★고품질(인터넷 필요)" : (v.localService ? "  (오프라인)" : ""));
+    sel.appendChild(o);
+  });
+  $("voiceCount").textContent = voices.length ? `한국어 ${voices.length}개` : "";
+  let pick = voices.findIndex(v => v.name === S.voiceName);
+  if (pick < 0) pick = 0;
+  if (voices.length){ sel.value = pick; S.voice = voices[pick]; }
+  const warn = $("voiceWarn");
+  if (!synth){ warn.style.display="block"; warn.textContent="이 브라우저는 음성 읽기를 지원하지 않습니다. Microsoft Edge로 열어 주세요."; }
+  else if (!voices.length){ warn.style.display="block"; warn.textContent="한국어 목소리를 찾지 못했습니다. Edge로 열었는지, 인터넷이 연결되어 있는지 확인해 주세요."; }
+  else if (!voices.some(v=>/natural/i.test(v.name))){ warn.style.display="block"; warn.textContent="고품질(Natural) 목소리가 보이지 않습니다. Edge 브라우저 + 인터넷 연결 상태에서 다시 열면 나타납니다."; }
+  else warn.style.display="none";
+}
+if (synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
+
+function speak(text, opts = {}){
+  return new Promise(resolve=>{
+    lastSpeech = text;
+    if (!synth){ resolve(); return; }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    if (S.voice) u.voice = S.voice;
+    u.lang = "ko-KR";
+    u.rate = S.rate * (opts.rateMul || 1);
+    u.pitch = Math.min(2, S.pitch * (opts.pitchMul || 1));
+    let done = false;
+    const finish = () => { if (!done){ done = true; clearTimeout(safety); setSpeaking(false); resolve(); } };
+    // onend가 안 오는 브라우저 버그 대비 안전 타이머
+    const safety = setTimeout(finish, Math.max(4000, text.length * 260 / u.rate));
+    u.onend = finish; u.onerror = finish;
+    currentUtter = u; // 가비지 컬렉션으로 onend가 사라지는 문제 방지
+    setSpeaking(true);
+    synth.speak(u);
+  });
+}
+function setSpeaking(on){
+  const el = document.querySelector(".speaking");
+  if (el) el.style.visibility = on ? "visible" : "hidden";
+}
+
+/* ---------- 비프음 (Web Audio) ---------- */
+let actx = null;
+function audioUnlock(){ // 클릭 순간에 오디오를 깨워 둠 (브라우저 자동재생 제한)
+  try{ if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); if (actx.state==="suspended") actx.resume(); }catch(e){}
+}
+function beep(freq, dur){
+  if (!actx || S.beep <= 0) return;
+  const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+  o.type = "square"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.25*S.beep, t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t+dur+0.02);
+}
+function tick(n){           // n = 남은 초
+  if (n > 3) beep(880, 0.12);                  // 보통: 삐
+  else { beep(1320, 0.18); setTimeout(()=>beep(1320,0.12), 220); } // 마지막 3초: 높게 삐삐
+}
+
+/* ---------- 말할 문장 만들기 ---------- */
+const sayOX = a => a.trim().toUpperCase() === "O" ? "오" : a.trim().toUpperCase() === "X" ? "엑스" : a;
+function questionSpeech(q, n){
+  const typeSay = q.type === "OX" ? "오엑스 문제입니다. " : "";
+  return `${n}번 문제. ${typeSay}${q.question}`;
+}
+function answerSpeech(q){
+  let ex = (q.explanation||"").trim();
+  if (ex && !/[.!?。]$|[다요죠]$/.test(ex)) ex += "입니다.";
+  return `정답은, ${sayOX(q.answer)}입니다. ${ex}`;
+}
+
+/* ---------- 화면 ---------- */
+function renderQuestion(){
+  const q = QUESTIONS[qi];
+  $("qno").innerHTML = `${qi+1}번 문제<span class="qcount">/ ${QUESTIONS.length}</span>`;
+  $("meta").innerHTML =
+    `<span class="tag">${q.subject}</span><span class="tag">${q.field}</span>` +
+    (q.type === "OX" ? `<span class="tag ox">O · X</span>` : "");
+  $("question").textContent = q.question;
+}
+function setStage(html){ $("stage").innerHTML = html; }
+function setMain(label, disabled=false){ const b=$("mainBtn"); b.textContent=label; b.disabled=disabled; }
+
+function ringHTML(n, total){
+  const r = 54, c = 2*Math.PI*r, off = c * (1 - n/total);
+  return `<div class="ring ${n<=3?'low':''}"><svg viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#2a3b5e" stroke-width="10"/>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="${n<=3?'#ff6b6b':'#f2c14e'}" stroke-width="10" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${off}" style="transition:stroke-dashoffset 1s linear"/>
+    </svg><div class="num">${n}</div></div>`;
+}
+
+/* ---------- 진행 단계 ---------- */
+function goIdle(){
+  clearInterval(timer); if (synth) synth.cancel();
+  state = "idle"; renderQuestion();
+  $("question").style.visibility = "hidden";
+  setStage(`<div class="speaking" style="visibility:hidden"><span class="dot"></span>읽는 중</div>`);
+  setMain("▶ AI가 문제 읽기");
+  $("manualBtn").style.display = "";
+}
+function goManual(){        // 사람이 직접 읽는 경우: 음성 없이 문제 표시 + 바로 카운트다운
+  if (state !== "idle") return;
+  state = "reading";
+  lastSpeech = questionSpeech(QUESTIONS[qi], qi+1);
+  $("question").style.visibility = "visible";
+  $("manualBtn").style.display = "none";
+  goCountdown();
+}
+async function goReading(){
+  state = "reading";
+  $("manualBtn").style.display = "none";
+  $("question").style.visibility = "visible";
+  setStage(`<div class="speaking"><span class="dot"></span>문제를 읽고 있습니다</div>`);
+  setMain("읽는 중…", true);
+  await speak(questionSpeech(QUESTIONS[qi], qi+1));
+  if (state === "reading") goCountdown();
+}
+function goCountdown(){
+  state = "countdown"; remain = S.secs;
+  setStage(ringHTML(remain, S.secs));
+  setMain("⏩ 시간 건너뛰기");
+  tick(remain);
+  clearInterval(timer);
+  timer = setInterval(()=>{
+    remain--;
+    if (remain <= 0){ clearInterval(timer); goCall(); }
+    else { setStage(ringHTML(remain, S.secs)); tick(remain); }
+  }, 1000);
+}
+async function goCall(){
+  clearInterval(timer);
+  state = "call";
+  setStage(`<div class="call">정답판을 들어주세요!</div>`);
+  setMain("✔ 정답 공개");
+  await speak("정답판을 들어주세요!", { pitchMul: 1.08, rateMul: 1.05 });
+}
+async function goReveal(){
+  state = "reveal";
+  const q = QUESTIONS[qi];
+  setStage(`<div class="answer">정답<b>${q.answer}</b></div><div class="expl">${q.explanation||""}</div>`);
+  setMain(qi < QUESTIONS.length-1 ? "다음 문제 ▶" : "테스트 끝 · 처음으로");
+  await speak(answerSpeech(q));
+}
+function next(){
+  if (state === "idle") goReading();
+  else if (state === "countdown") goCall();
+  else if (state === "call") goReveal();
+  else if (state === "reveal"){
+    if (qi < QUESTIONS.length-1){ qi++; } else { qi = 0; }
+    goIdle();
+  }
+}
+
+/* ---------- 이벤트 ---------- */
+$("mainBtn").onclick = () => { audioUnlock(); next(); };
+$("manualBtn").onclick = () => { audioUnlock(); goManual(); };
+$("replayBtn").onclick = () => { if (lastSpeech && state !== "countdown") speak(lastSpeech); };
+$("resetBtn").onclick = () => { qi = 0; goIdle(); };
+document.addEventListener("keydown", e=>{
+  if ($("settings").classList.contains("open")) { if (e.key==="Escape") closeSettings(); return; }
+  if ($("importer").classList.contains("open")) { if (e.key==="Escape") closeImport(); return; }
+  if ([" ","Enter","ArrowRight","PageDown"].includes(e.key)){ e.preventDefault(); audioUnlock(); if (!$("mainBtn").disabled) next(); }
+  else if (e.key==="m"||e.key==="M"||e.key==="ㅡ"){ audioUnlock(); goManual(); }
+  else if (e.key==="r"||e.key==="R"||e.key==="ㄱ"){ $("replayBtn").click(); }
+  else if (e.key==="Escape"){ $("resetBtn").click(); }
+});
+
+function openSettings(){ $("settings").classList.add("open"); loadVoices(); }
+function closeSettings(){ $("settings").classList.remove("open"); savePrefs(); $("mainBtn").focus(); }
+$("openSettings").onclick = openSettings;
+$("closeSettings").onclick = closeSettings;
+$("voiceSel").onchange = e => { S.voice = voices[+e.target.value]; };
+$("rate").oninput = e => { S.rate = +e.target.value; $("rateV").textContent = S.rate.toFixed(2)+"배"; };
+$("pitch").oninput = e => { S.pitch = +e.target.value; $("pitchV").textContent = S.pitch.toFixed(2); };
+$("secs").oninput = e => { S.secs = Math.max(3, Math.min(60, +e.target.value || 10)); };
+$("previewBtn").onclick = () => speak("안녕하세요. 도전 골든벨, 1번 문제입니다.");
+$("beepVol").oninput = e => { S.beep = +e.target.value; $("beepV").textContent = Math.round(S.beep*100)+"%"; };
+$("beepTestBtn").onclick = () => { audioUnlock(); [5,4,3,2,1].forEach((n,i)=>setTimeout(()=>tick(n), i*1000)); };
+
+/* ---------- 엑셀 붙여넣기 등록 ---------- */
+function parseTSV(text){           // 엑셀 복사본(탭 구분, 셀 안 줄바꿈은 "..."로 감싸짐) 해석
+  const rows=[]; let row=[], cell="", q=false;
+  for (let i=0;i<text.length;i++){
+    const c=text[i];
+    if (q){ if (c==='"'){ if (text[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=c; }
+    else if (c==='"' && cell==="") q=true;
+    else if (c==='\t'){ row.push(cell); cell=""; }
+    else if (c==='\n' || c==='\r'){ if (c==='\r' && text[i+1]==='\n') i++; row.push(cell); rows.push(row); row=[]; cell=""; }
+    else cell+=c;
+  }
+  if (cell!=="" || row.length){ row.push(cell); rows.push(row); }
+  return rows.map(r=>r.map(x=>x.trim())).filter(r=>r.some(x=>x));
+}
+function normOX(a){
+  const t=a.replace(/\s/g,"").toUpperCase();
+  if (["O","Ｏ","○","◯","오"].includes(t)) return "O";
+  if (["X","Ｘ","×","✕","엑스"].includes(t)) return "X";
+  return null;
+}
+function buildQuestions(rows){
+  if (!rows.length) return [];
+  let col = {subject:0, field:1, question:2, answer:3, explanation:4};
+  const h = rows[0].join("|");
+  if (/문제|문항/.test(h)){
+    const head = rows.shift(), find = re => head.findIndex(x=>re.test(x.replace(/\s/g,"")));
+    col = { subject:find(/과목/), field:find(/분야|영역/), question:find(/^(문제|문항)/), answer:find(/정답|답/), explanation:find(/해설|설명/) };
+  }
+  const get = (r,i) => (i>=0 && i<r.length) ? r[i] : "";
+  return rows.map(r=>{
+    let question = get(r,col.question), answerRaw = get(r,col.answer), explanation = get(r,col.explanation);
+    let type = "";
+    const m = question.match(/^\s*[\(（\[]\s*([^\)）\]]*)[\)）\]]\s*/);
+    if (m){ question = question.slice(m[0].length); type = /O.*X|○.*×/i.test(m[1]) ? "OX" : m[1].trim(); }
+    let answer = answerRaw;
+    const am = answerRaw.match(/^([^\(（]+?)\s*[\(（](.*)[\)）]\s*$/s);
+    if (am){ answer = am[1].trim(); if (!explanation) explanation = am[2].trim(); }
+    const ox = normOX(answer);
+    if (ox) { answer = ox; if (!type) type = "OX"; }
+    const errs = [];
+    if (!question) errs.push("문제 없음");
+    if (!answer) errs.push("정답 없음");
+    if (type==="OX" && !ox) errs.push("OX 정답이 O/X가 아님");
+    return { subject:get(r,col.subject), field:get(r,col.field), type, question, answer, explanation, errs };
+  });
+}
+let pending = [];
+const esc = s => String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function previewImport(){
+  pending = buildQuestions(parseTSV($("pasteArea").value));
+  delete $("doImport").dataset.confirm; $("doImport").textContent="등록하기";
+  const bad = pending.filter(q=>q.errs.length).length;
+  if (!pending.length){ $("pWrap").style.display="none"; $("pStatus").textContent="붙여넣으면 아래에 미리보기가 나타납니다."; $("doImport").disabled=true; return; }
+  $("pStatus").innerHTML = `<b>${pending.length}문항</b> 인식` + (bad ? ` · <span style="color:var(--red)">확인 필요 ${bad}건 (빨간 칸)</span>` : " · 모두 정상");
+  $("pTable").innerHTML = `<tr><th>#</th><th>과목</th><th>분야</th><th>유형</th><th>문제</th><th>정답</th><th>해설</th></tr>` +
+    pending.map((q,i)=>`<tr><td>${i+1}</td><td>${esc(q.subject)}</td><td>${esc(q.field)}</td><td>${esc(q.type)}</td>
+      <td${q.errs.includes("문제 없음")?' class="err"':''}>${esc(q.question)||"(비어 있음)"}</td>
+      <td${q.errs.some(e=>/정답/.test(e))?' class="err"':''}>${esc(q.answer)||"(비어 있음)"}${q.errs.filter(e=>/OX/.test(e)).length?"<br><small>O 또는 X여야 함</small>":""}</td>
+      <td>${esc(q.explanation)}</td></tr>`).join("");
+  $("pWrap").style.display="block";
+  $("doImport").disabled = false;
+}
+function openImport(){ $("importer").classList.add("open"); $("pasteArea").focus(); }
+function closeImport(){ $("importer").classList.remove("open"); $("mainBtn").focus(); }
+$("openImport").onclick = openImport;
+$("cancelImport").onclick = closeImport;
+$("pasteArea").addEventListener("input", previewImport);
+$("doImport").onclick = () => {
+  const bad = pending.filter(q=>q.errs.length).length;
+  if (bad && !$("doImport").dataset.confirm){ $("doImport").dataset.confirm="1"; $("doImport").textContent=`확인 필요 ${bad}건 포함해 등록`; return; }
+  delete $("doImport").dataset.confirm; $("doImport").textContent="등록하기";
+  QUESTIONS = pending.map(({errs,...q})=>q);
+  try{ localStorage.setItem("gb_questions", JSON.stringify(QUESTIONS)); }catch(e){}
+  SOURCE = "붙여넣은 문항"; showSource();
+  closeImport(); qi = 0; goIdle();
+};
+
+loadPrefs();
+$("rate").value = S.rate; $("pitch").value = S.pitch; $("secs").value = S.secs;
+$("rateV").textContent = S.rate.toFixed(2)+"배"; $("pitchV").textContent = S.pitch.toFixed(2);
+$("beepVol").value = S.beep; $("beepV").textContent = Math.round(S.beep*100)+"%";
+goIdle();
+showSource();
+loadQuestionFile();
+</script>
+</body>
+</html>
