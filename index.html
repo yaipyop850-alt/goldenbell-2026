@@ -6,24 +6,29 @@
 <title>도전! 골든벨</title>
 <style>
   :root{
-    --bg:#0f1a2e; --panel:#16243f; --line:#2a3b5e; --text:#f3f5fa; --muted:#9fb0cf;
+    --bg:#173d2d; --panel:#1f4b38; --line:#2f6049; --text:#f4f7f2; --muted:#a8c7b6;
     --gold:#f2c14e; --gold-d:#c9971f; --red:#ff6b6b; --green:#4cd39a;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
     font-family:"Malgun Gothic","맑은 고딕","Noto Sans KR","Noto Sans CJK KR",sans-serif}
   body{display:flex;flex-direction:column}
-  header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--line)}
-  .brand{font-weight:800;font-size:22px;letter-spacing:.02em}
+  header{display:flex;align-items:center;justify-content:space-between;padding:6px 18px;opacity:.55;transition:opacity .2s}
+  header:hover{opacity:1}
+  .brand{font-weight:800;font-size:16px;letter-spacing:.02em}
   .brand span{color:var(--gold)}
-  .hbtn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:15px;cursor:pointer;font-family:inherit}
+  .hbtn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;cursor:pointer;font-family:inherit}
   .hbtn:hover{color:var(--text);border-color:var(--muted)}
-  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 6vw;text-align:center;gap:28px}
+  main{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px 5vw;text-align:center}
+  #content{display:flex;flex-direction:column;align-items:center;gap:24px;width:100%}
   .meta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   .tag{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 16px;font-size:clamp(14px,1.6vw,20px);color:var(--muted)}
   .tag.ox{color:var(--gold);border-color:var(--gold-d)}
-  .qno{font-size:clamp(28px,3.4vw,46px);font-weight:800;color:var(--gold)}
-  .question{font-size:clamp(30px,4.4vw,64px);font-weight:700;line-height:1.45;max-width:1400px;word-break:keep-all}
+  .qno{font-size:clamp(30px,3.6vw,52px);font-weight:800;color:var(--gold)}
+  .question{font-size:clamp(38px,5.6vw,92px);font-weight:700;line-height:1.45;max-width:1500px;word-break:keep-all;white-space:pre-line}
+  .question.m{font-size:clamp(32px,4.5vw,74px)}
+  .question.l{font-size:clamp(28px,3.6vw,60px);line-height:1.45}
+  .hidden-chip{display:inline-block;border:2px dashed var(--gold-d);color:var(--gold);border-radius:12px;padding:0 .5em;font-size:.8em}
   .stage{min-height:clamp(160px,24vh,300px);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px}
   .ring{position:relative;width:clamp(150px,20vh,240px);height:clamp(150px,20vh,240px)}
   .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
@@ -32,20 +37,43 @@
   .call{font-size:clamp(40px,6.5vw,96px);font-weight:900;color:var(--gold);animation:pulse 1s ease-in-out infinite}
   @keyframes pulse{50%{transform:scale(1.05)}}
   .answer{font-size:clamp(28px,3vw,40px);color:var(--muted)}
-  .answer b{display:block;font-size:clamp(90px,14vh,170px);line-height:1.1;color:var(--green)}
-  .expl{font-size:clamp(24px,3vw,42px);font-weight:600;word-break:keep-all}
+  .answer b{display:block;font-size:clamp(90px,14vh,170px);line-height:1.1;color:#ffe066;text-shadow:0 0 28px rgba(255,214,90,.35);word-break:keep-all}
+  .answer b.m{font-size:clamp(56px,9vh,110px)}
+  .answer b.l{font-size:clamp(40px,6.5vh,76px)}
+  .expl{font-size:clamp(28px,3.6vw,54px);font-weight:600;word-break:keep-all}
   .speaking{color:var(--muted);font-size:20px;display:flex;align-items:center;gap:10px}
   .dot{width:12px;height:12px;border-radius:50%;background:var(--gold);animation:blink 1s infinite}
   @keyframes blink{50%{opacity:.25}}
-  footer{display:flex;align-items:center;justify-content:center;gap:14px;padding:18px;border-top:1px solid var(--line);flex-wrap:wrap}
+  footer{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:4px 12px 6px;opacity:.4;transition:opacity .2s}
+  footer:hover{opacity:1}
+  footer .sub-btn,footer .main-btn{padding:4px 10px;font-size:13px;border-radius:7px;min-width:0;font-weight:600}
+  footer .keys{width:auto;margin-right:auto;font-size:12px;text-align:left}
   .main-btn{background:var(--gold);color:#1a1405;border:none;border-radius:14px;padding:16px 40px;font-size:24px;font-weight:800;cursor:pointer;font-family:inherit;min-width:300px}
   .main-btn:hover{background:#ffd56e}
-  .main-btn:disabled{background:#3a4a6a;color:#8796b4;cursor:default}
+  .main-btn:disabled{background:#3a5a4b;color:#8fae9f;cursor:default}
   .sub-btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:16px 22px;font-size:18px;cursor:pointer;font-family:inherit}
   .keys{color:var(--muted);font-size:14px;width:100%;text-align:center}
   kbd{border:1px solid var(--line);border-radius:5px;padding:1px 6px;background:var(--panel);font-family:inherit}
+  /* 비밀번호 */
+  #gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;align-items:center;justify-content:center}
+  #gate.hide{display:none}
+  #gate form{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:32px 34px;width:min(420px,90vw);text-align:center}
+  #gate h2{margin:0 0 6px;font-size:24px}
+  #gate p{margin:0 0 18px;color:var(--muted);font-size:15px}
+  #gate input{width:100%;font-size:20px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit;text-align:center;letter-spacing:.1em}
+  #gate .msg{min-height:22px;margin:10px 0 4px;color:var(--red);font-size:15px}
+  #gate button{width:100%;min-width:0}
+  /* 오프닝 타이틀 */
+  #title{position:fixed;inset:0;z-index:20;background:#173d2d;display:flex;align-items:center;justify-content:center;gap:4vw;cursor:pointer}
+  #title.hide{display:none}
+  #title .emblem{height:min(42vh,32vw);animation:rise .9s ease-out both;
+    filter:drop-shadow(0 0 1.5px rgba(255,255,255,.95)) drop-shadow(0 0 14px rgba(255,255,255,.45))}
+  #title .logo{width:min(58vw,105vh);animation:pop 1s .25s cubic-bezier(.2,1.4,.4,1) both}
+  #title .tip{position:absolute;bottom:2.5vh;left:0;right:0;text-align:center;color:rgba(255,255,255,.28);font-size:15px}
+  @keyframes rise{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+  @keyframes pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
   /* settings */
-  .overlay{position:fixed;inset:0;background:rgba(5,10,20,.7);display:none;align-items:center;justify-content:center;z-index:10}
+  .overlay{position:fixed;inset:0;background:rgba(4,16,10,.72);display:none;align-items:center;justify-content:center;z-index:30}
   .overlay.open{display:flex}
   .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px 28px;width:min(560px,92vw);text-align:left}
   .sheet h2{margin:0 0 18px;font-size:22px}
@@ -61,38 +89,49 @@
   .ptable-wrap{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:12px}
   table.pt{width:100%;border-collapse:collapse;font-size:14px}
   .pt th,.pt td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-  .pt th{position:sticky;top:0;background:#1d2e4f;color:var(--muted);font-weight:600}
+  .pt th{position:sticky;top:0;background:#24543f;color:var(--muted);font-weight:600}
   .pt td.err{color:var(--red)}
   .pstatus{margin-top:10px;font-size:15px;color:var(--muted)}
   .pstatus b{color:var(--gold)}
   .qcount{color:var(--muted);font-size:16px;font-weight:500;margin-left:8px}
+  .pwin{width:100%;font-size:16px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit}
   .sheet-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
 </style>
 </head>
 <body>
-<header>
-  <div class="brand">도전! <span>골든벨</span> <small id="srcInfo" style="color:var(--muted);font-weight:500;font-size:14px"></small></div>
-  <div style="display:flex;gap:8px">
-    <button class="hbtn" id="openImport">📋 문항 등록</button>
-    <button class="hbtn" id="openSettings">⚙ 소리 설정</button>
-  </div>
-</header>
+<div id="gate">
+  <form id="gateForm" autocomplete="off">
+    <h2>🔒 도전! 골든벨</h2>
+    <p>진행용 비밀번호를 입력해 주세요</p>
+    <input type="password" id="gatePw" autocomplete="off">
+    <div class="msg" id="gateMsg"></div>
+    <button class="main-btn" type="submit" id="gateBtn">입장</button>
+  </form>
+</div>
+<div id="title">
+  <img class="emblem" src="assets/emblem.png" alt="학교 상징">
+  <img class="logo" src="assets/logo.png" alt="도전! 골든벨">
+  <div class="tip">Space · → · 클릭: 인트로 음악 → 한 번 더: 1번 문제로 &nbsp;|&nbsp; Esc: 이 화면으로 돌아오기</div>
+</div>
 
-<main>
+<main id="mainArea"><div id="content">
   <div>
     <div class="qno" id="qno">1번 문제</div>
     <div class="meta" id="meta"></div>
   </div>
   <div class="question" id="question" style="visibility:hidden"></div>
   <div class="stage" id="stage"></div>
-</main>
+</div></main>
 
 <footer>
-  <button class="sub-btn" id="replayBtn" title="R">↻ 다시 읽기</button>
-  <button class="sub-btn" id="manualBtn" title="M">🎤 직접 읽기 · 카운트만</button>
-  <button class="main-btn" id="mainBtn">▶ AI가 문제 읽기</button>
-  <button class="sub-btn" id="resetBtn" title="Esc">⟲ 처음으로</button>
-  <div class="keys"><kbd>Space</kbd> / <kbd>→</kbd> / 프레젠터 버튼: 다음 단계 · <kbd>M</kbd>: 직접 읽기(카운트만) · <kbd>R</kbd>: 다시 읽기 · <kbd>Esc</kbd>: 처음으로</div>
+  <div class="keys"><span id="srcInfo"></span> &nbsp;|&nbsp; <kbd>→</kbd> 다음 단계 · <kbd>↓</kbd> 직접 읽기(카운트만) · <kbd>↑</kbd> 다시 읽기 · <kbd>←</kbd> 이전 문제 · <kbd>Esc</kbd> 오프닝</div>
+  <button class="sub-btn" id="prevBtn" title="←">◀ 이전</button>
+  <button class="sub-btn" id="replayBtn" title="↑">↻ 다시 읽기</button>
+  <button class="sub-btn" id="manualBtn" title="↓">🎤 직접 읽기</button>
+  <button class="main-btn" id="mainBtn" title="→">▶ AI가 문제 읽기</button>
+  <button class="sub-btn" id="resetBtn">⟲ 1번으로</button>
+  <button class="sub-btn" id="openImport">📋 문항</button>
+  <button class="sub-btn" id="openSettings">⚙ 소리</button>
 </footer>
 
 <div class="overlay" id="settings">
@@ -116,6 +155,10 @@
       <input type="range" id="beepVol" min="0" max="1" step="0.05" value="0.6">
     </div>
     <div class="row">
+      <label>BGM · 효과음 크기 <span id="sfxV"></span></label>
+      <input type="range" id="sfxVol" min="0" max="1" step="0.05" value="0.8">
+    </div>
+    <div class="row">
       <label>답 쓰는 시간 (초)</label>
       <input type="number" id="secs" min="3" max="60" value="10">
     </div>
@@ -123,6 +166,22 @@
       <button class="sub-btn" id="beepTestBtn">♪ 비프음 듣기</button>
       <button class="sub-btn" id="previewBtn">🔊 목소리 듣기</button>
       <button class="main-btn" style="min-width:0;padding:14px 26px;font-size:18px" id="closeSettings">완료</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pwMenu">
+  <div class="sheet">
+    <h2>🔑 비밀번호 바꾸기</h2>
+    <p class="hint">새 비밀번호로 암호화한 문항 파일(<b>questions.enc.json</b>)과 음원 파일(<b>sound.enc.json</b>)을 내려받습니다.<br>
+    GitHub 저장소에서 <b>Add file → Upload files</b>로 두 파일을 올려 기존 파일을 덮어쓰면, 1~2분 뒤부터 새 비밀번호가 적용됩니다.</p>
+    <div class="row"><label>지금 비밀번호</label><input type="password" id="pwOld" class="pwin"></div>
+    <div class="row"><label>새 비밀번호</label><input type="password" id="pwNew" class="pwin"></div>
+    <div class="row"><label>새 비밀번호 확인</label><input type="password" id="pwNew2" class="pwin"></div>
+    <div class="pstatus" id="pwMsg"></div>
+    <div class="sheet-actions" style="margin-top:16px">
+      <button class="sub-btn" id="pwCancel">닫기</button>
+      <button class="main-btn" style="min-width:0;padding:14px 26px;font-size:18px" id="pwMake">파일 만들기</button>
     </div>
   </div>
 </div>
@@ -154,17 +213,39 @@ const SAMPLE = [
   }
 ];
 
-// 문항 우선순위: ① 저장소의 questions.tsv 파일 → ② 이 브라우저에 붙여넣은 문항 → ③ 예시 문항
+// 문항 우선순위: ① 저장소의 암호화된 문항 파일(questions.enc.json, 비밀번호로 해제) → ② 이 브라우저에 붙여넣은 문항 → ③ 예시 문항
 let QUESTIONS = SAMPLE, SOURCE = "예시 문항";
 try{ const saved = JSON.parse(localStorage.getItem("gb_questions")||"null"); if (Array.isArray(saved) && saved.length){ QUESTIONS = saved; SOURCE = "붙여넣은 문항"; } }catch(e){}
+// 문항 파일은 비밀번호로 암호화(AES-GCM)되어 있어, 비밀번호 없이는 저장소에서도 내용을 볼 수 없음
+let ENC = null;
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function decryptWith(E, pw){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({name:"PBKDF2", salt:b64(E.salt), iterations:E.iter, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+  const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv:b64(E.iv)}, key, b64(E.ct));
+  return new TextDecoder().decode(pt);
+}
+const decryptQuestions = pw => decryptWith(ENC, pw);
+let PLAIN = null, CUR_PW = null;
+async function unlock(pw){
+  const text = await decryptQuestions(pw);
+  PLAIN = text; CUR_PW = pw;
+  loadSounds(pw);
+  const list = buildQuestions(parseTSV(text)).filter(q => !q.errs.length).map(({errs,...q})=>q);
+  QUESTIONS = list; SOURCE = "문항 파일"; qi = 0; goIdle(); showSource();
+  try{ sessionStorage.setItem("gb_pw", pw); }catch(e){}   // 브라우저를 닫으면 사라짐
+  $("gate").classList.add("hide");
+}
 async function loadQuestionFile(){
   try{
-    const res = await fetch("questions.tsv?v=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) return;
-    const list = buildQuestions(parseTSV(await res.text())).filter(q => !q.errs.length).map(({errs,...q})=>q);
-    if (list.length){ QUESTIONS = list; SOURCE = "문항 파일"; if (state === "idle"){ qi = 0; goIdle(); } }
-  }catch(e){}
-  showSource();
+    const res = await fetch("questions.enc.json?v=" + Date.now(), { cache: "no-store" });
+    if (!res.ok){ $("gate").classList.add("hide"); showSource(); return; }   // 암호 파일이 없으면 잠금 없이 (붙여넣기/예시 문항)
+    ENC = await res.json();
+  }catch(e){ $("gate").classList.add("hide"); showSource(); return; }
+  $("gate").classList.remove("hide"); $("gatePw").focus();
+  let saved = null; try{ saved = sessionStorage.getItem("gb_pw"); }catch(e){}
+  if (saved){ try{ await unlock(saved); return; }catch(e){} }
 }
 function showSource(){ const el = document.getElementById("srcInfo"); if (el) el.textContent = `${SOURCE} · ${QUESTIONS.length}문항`; }
 
@@ -172,11 +253,11 @@ function showSource(){ const el = document.getElementById("srcInfo"); if (el) el
 // idle → reading → countdown → call(정답판 대기) → reveal
 let qi = 0, state = "idle", timer = null, remain = 0, lastSpeech = "";
 const $ = id => document.getElementById(id);
-const S = { voice: null, rate: 0.9, pitch: 1, secs: 10, beep: 0.6 };
+const S = { voice: null, rate: 0.9, pitch: 1, secs: 10, beep: 0.6, sfx: 0.8 };
 
 /* ---------- 설정 저장(브라우저별) ---------- */
-function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep}); S.voiceName = p.voiceName; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,voiceName:S.voice&&S.voice.name})); }catch(e){} }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx}); S.voiceName = p.voiceName; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,voiceName:S.voice&&S.voice.name})); }catch(e){} }
 
 /* ---------- 음성 ---------- */
 const synth = window.speechSynthesis;
@@ -255,16 +336,59 @@ function tick(n){           // n = 남은 초
   else { beep(1320, 0.18); setTimeout(()=>beep(1320,0.12), 220); } // 마지막 3초: 높게 삐삐
 }
 
+/* ---------- BGM·효과음 ---------- */
+// 음원은 문항과 같은 비밀번호로 암호화된 sound.enc.json 안에 들어 있음 (공개 저장소에서 바로 내려받을 수 없게)
+// intro: 오프닝 반복 / write: '정답을 써주세요' 뒤 / timeup: 카운트다운 끝 / raise: '정답판을 들어주세요' 뒤
+// 파일이 없거나 재생이 막히면 조용히 건너뜀
+const sndEl = {}, sndOK = {};
+let SOUND_PLAIN = null;
+function setSounds(map){
+  for (const k of ["intro","write","timeup","raise"]){
+    if (!map[k]) continue;
+    const a = new Audio(URL.createObjectURL(new Blob([b64(map[k])], {type:"audio/mp4"})));
+    a.preload = "auto"; sndEl[k] = a;
+    a.addEventListener("canplaythrough", ()=>{ sndOK[k] = true; }); a.addEventListener("error", ()=>{ sndOK[k] = false; });
+    a.load();
+  }
+  if (sndEl.intro) sndEl.intro.loop = true;
+}
+async function loadSounds(pw){
+  try{
+    const res = await fetch("sound.enc.json?v=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const text = await decryptWith(await res.json(), pw);
+    SOUND_PLAIN = text; setSounds(JSON.parse(text));
+  }catch(e){}
+}
+function sfx(name){            // 끝날 때까지 기다리는 효과음
+  return new Promise(resolve=>{
+    const a = sndEl[name]; if (!a || S.sfx <= 0) { resolve(); return; }
+    let done = false; const fin = () => { if (!done){ done = true; clearTimeout(t); resolve(); } };
+    const t = setTimeout(fin, 8000);
+    a.onended = fin; a.onerror = fin;
+    try{ a.pause(); a.currentTime = 0; a.volume = S.sfx; const pr = a.play(); if (pr) pr.catch(fin); }catch(e){ fin(); }
+  });
+}
+function stopSfx(){ ["write","timeup","raise"].forEach(k=>{ const a = sndEl[k]; if (a){ a.onended = null; try{ a.pause(); }catch(e){} } }); }
+let fadeT = null;
+function introPlay(){ const a = sndEl.intro; if (!a || S.sfx <= 0) return; clearInterval(fadeT); try{ a.currentTime = 0; a.volume = S.sfx * 0.8; a.play().catch(()=>{}); }catch(e){} }
+function introFade(){ const a = sndEl.intro; if (!a || a.paused) return; clearInterval(fadeT);
+  fadeT = setInterval(()=>{ a.volume = Math.max(0, a.volume - 0.05); if (a.volume <= 0.01){ clearInterval(fadeT); a.pause(); } }, 80); }
+
 /* ---------- 말할 문장 만들기 ---------- */
 const sayOX = a => a.trim().toUpperCase() === "O" ? "오" : a.trim().toUpperCase() === "X" ? "엑스" : a;
 function questionSpeech(q, n){
   const typeSay = q.type === "OX" ? "오엑스 문제입니다. " : "";
-  return `${n}번 문제. ${typeSay}${q.question}`;
+  const text = q.question.replace(/\[\[(.*?)\]\]/gs, "$1").replace(/_{2,}/g, " 빈칸 ");
+  return `${n}번 문제. ${typeSay}${text}`;
 }
 function answerSpeech(q){
   let ex = (q.explanation||"").trim();
   if (ex && !/[.!?。]$|[다요죠]$/.test(ex)) ex += "입니다.";
-  return `정답은, ${sayOX(q.answer)}입니다. ${ex}`;
+  const ans = sayOX(q.answer).trim();
+  // 정답이 문장(…다, …자, …어!)이면 '입니다'를 붙이지 않음
+  const head = /([다요자어죠])[.!?]?$|[.!?]$/.test(ans) ? `정답은, ${ans.replace(/[.!?]?$/, ".")}` : `정답은, ${ans}입니다.`;
+  return `${head} ${ex}`;
 }
 
 /* ---------- 화면 ---------- */
@@ -272,47 +396,71 @@ function renderQuestion(){
   const q = QUESTIONS[qi];
   $("qno").innerHTML = `${qi+1}번 문제<span class="qcount">/ ${QUESTIONS.length}</span>`;
   $("meta").innerHTML =
-    `<span class="tag">${q.subject}</span><span class="tag">${q.field}</span>` +
+    [q.field || q.subject].filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join("") +
     (q.type === "OX" ? `<span class="tag ox">O · X</span>` : "");
-  $("question").textContent = q.question;
+  // [[ ]] 안의 내용은 읽어 주기만 하고 화면에는 숨김 (받아쓰기 등)
+  $("question").innerHTML = esc(q.question).replace(/\[\[(.*?)\]\]/gs, `<span class="hidden-chip">🔊 소리로만 들려 드립니다</span>`);
+  const len = q.question.length;
+  $("question").className = "question" + (len > 130 ? " l" : len > 70 ? " m" : "");
+  fit();
 }
-function setStage(html){ $("stage").innerHTML = html; }
+function setStage(html){ $("stage").innerHTML = html; fit(); }
+// 화면에 다 들어오지 않으면 내용 전체를 조금씩 줄임 (프로젝터 해상도 차이 대비)
+function fit(){
+  const m = $("mainArea"), c = $("content");
+  let k = 1; c.style.zoom = 1;
+  while (m.scrollHeight > m.clientHeight + 1 && k > 0.45){ k -= 0.04; c.style.zoom = k; }
+}
+window.addEventListener("resize", fit);
 function setMain(label, disabled=false){ const b=$("mainBtn"); b.textContent=label; b.disabled=disabled; }
 
 function ringHTML(n, total){
   const r = 54, c = 2*Math.PI*r, off = c * (1 - n/total);
   return `<div class="ring ${n<=3?'low':''}"><svg viewBox="0 0 120 120">
-    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#2a3b5e" stroke-width="10"/>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="#2f6049" stroke-width="10"/>
     <circle cx="60" cy="60" r="${r}" fill="none" stroke="${n<=3?'#ff6b6b':'#f2c14e'}" stroke-width="10" stroke-linecap="round"
       stroke-dasharray="${c}" stroke-dashoffset="${off}" style="transition:stroke-dashoffset 1s linear"/>
     </svg><div class="num">${n}</div></div>`;
 }
 
 /* ---------- 진행 단계 ---------- */
+let run = 0;                       // 단계가 바뀌면 진행 중이던 음성·효과음 흐름을 끊기 위한 번호
+const alive = id => id === run;
 function goIdle(){
-  clearInterval(timer); if (synth) synth.cancel();
+  run++; clearInterval(timer); if (synth) synth.cancel(); stopSfx();
   state = "idle"; renderQuestion();
   $("question").style.visibility = "hidden";
   setStage(`<div class="speaking" style="visibility:hidden"><span class="dot"></span>읽는 중</div>`);
   setMain("▶ AI가 문제 읽기");
   $("manualBtn").style.display = "";
 }
-function goManual(){        // 사람이 직접 읽는 경우: 음성 없이 문제 표시 + 바로 카운트다운
+// 문제를 읽은 뒤 공통: "정답을 써주세요" → 효과음 → 카운트다운
+async function afterRead(id){
+  setStage(`<div class="call" style="animation:none">정답을 써주세요!</div>`);
+  setMain("…", true);
+  await speak("정답을 써주세요!", { pitchMul: 1.05 });
+  if (!alive(id)) return;
+  await sfx("write");
+  if (alive(id)) goCountdown();
+}
+function goManual(){        // 사람이 직접 읽는 경우: 문제 낭독만 생략
   if (state !== "idle") return;
+  const id = ++run;
   state = "reading";
   lastSpeech = questionSpeech(QUESTIONS[qi], qi+1);
   $("question").style.visibility = "visible";
   $("manualBtn").style.display = "none";
-  goCountdown();
+  afterRead(id);
 }
 async function goReading(){
+  const id = ++run;
   state = "reading";
   $("manualBtn").style.display = "none";
   $("question").style.visibility = "visible";
   setStage(`<div class="speaking"><span class="dot"></span>문제를 읽고 있습니다</div>`);
   setMain("읽는 중…", true);
   await speak(questionSpeech(QUESTIONS[qi], qi+1));
-  if (state === "reading") goCountdown();
+  if (alive(id)) afterRead(id);
 }
 function goCountdown(){
   state = "countdown"; remain = S.secs;
@@ -326,18 +474,27 @@ function goCountdown(){
     else { setStage(ringHTML(remain, S.secs)); tick(remain); }
   }, 1000);
 }
+// 카운트다운 끝 → 시간종료 효과음 → "정답판을 들어주세요" → 효과음 → 선생님 신호 대기
 async function goCall(){
   clearInterval(timer);
+  const id = ++run;
   state = "call";
-  setStage(`<div class="call">정답판을 들어주세요!</div>`);
+  setStage(ringHTML(0, S.secs));
   setMain("✔ 정답 공개");
+  await sfx("timeup");
+  if (!alive(id)) return;
+  setStage(`<div class="call">정답판을 들어주세요!</div>`);
   await speak("정답판을 들어주세요!", { pitchMul: 1.08, rateMul: 1.05 });
+  if (!alive(id)) return;
+  await sfx("raise");
 }
 async function goReveal(){
+  run++; stopSfx();
   state = "reveal";
   const q = QUESTIONS[qi];
-  setStage(`<div class="answer">정답<b>${q.answer}</b></div><div class="expl">${q.explanation||""}</div>`);
-  setMain(qi < QUESTIONS.length-1 ? "다음 문제 ▶" : "테스트 끝 · 처음으로");
+  const al = q.answer.length, acls = al > 10 ? "l" : al > 5 ? "m" : "";
+  setStage(`<div class="answer">정답<b class="${acls}">${esc(q.answer)}</b></div><div class="expl">${esc(q.explanation||"")}</div>`);
+  setMain(qi < QUESTIONS.length-1 ? "다음 문제 ▶" : "마지막 문제 · 1번으로");
   await speak(answerSpeech(q));
 }
 function next(){
@@ -355,13 +512,35 @@ $("mainBtn").onclick = () => { audioUnlock(); next(); };
 $("manualBtn").onclick = () => { audioUnlock(); goManual(); };
 $("replayBtn").onclick = () => { if (lastSpeech && state !== "countdown") speak(lastSpeech); };
 $("resetBtn").onclick = () => { qi = 0; goIdle(); };
+// 진행 중이면 이 문제를 처음(대기)으로, 대기 상태면 이전 문제로
+function prevQuestion(){ if (state === "idle" && qi > 0) qi--; goIdle(); }
+$("prevBtn").onclick = prevQuestion;
+let introOn = false;
+function showTitle(){ run++; clearInterval(timer); if (synth) synth.cancel(); stopSfx(); introOn = false; $("title").classList.remove("hide"); }
+// 오프닝: 첫 번째 누름 = 인트로 BGM 반복 재생, 두 번째 누름 = BGM을 줄이며 1번 문제로
+function leaveTitle(){
+  audioUnlock();
+  if (!introOn && sndOK.intro && S.sfx > 0){ introOn = true; introPlay(); return; }
+  introOn = false; introFade();
+  $("title").classList.add("hide"); qi = 0; goIdle();
+}
+$("title").onclick = leaveTitle;
 document.addEventListener("keydown", e=>{
+  // 히든 메뉴: Ctrl + Shift + P (문항을 연 뒤에만)
+  if (e.ctrlKey && e.shiftKey && (e.key==="P"||e.key==="p"||e.code==="KeyP")){ e.preventDefault(); if (PLAIN) openPwMenu(); return; }
+  if ($("pwMenu").classList.contains("open")){ if (e.key==="Escape") closePwMenu(); return; }
+  if (!$("gate").classList.contains("hide")) return;
+  if (!$("title").classList.contains("hide")){
+    if ([" ","Enter","ArrowRight","PageDown"].includes(e.key)){ e.preventDefault(); leaveTitle(); }
+    return;
+  }
   if ($("settings").classList.contains("open")) { if (e.key==="Escape") closeSettings(); return; }
   if ($("importer").classList.contains("open")) { if (e.key==="Escape") closeImport(); return; }
   if ([" ","Enter","ArrowRight","PageDown"].includes(e.key)){ e.preventDefault(); audioUnlock(); if (!$("mainBtn").disabled) next(); }
-  else if (e.key==="m"||e.key==="M"||e.key==="ㅡ"){ audioUnlock(); goManual(); }
-  else if (e.key==="r"||e.key==="R"||e.key==="ㄱ"){ $("replayBtn").click(); }
-  else if (e.key==="Escape"){ $("resetBtn").click(); }
+  else if (["ArrowDown","m","M","ㅡ"].includes(e.key)){ e.preventDefault(); audioUnlock(); goManual(); }
+  else if (["ArrowUp","r","R","ㄱ"].includes(e.key)){ e.preventDefault(); $("replayBtn").click(); }
+  else if (["ArrowLeft","PageUp"].includes(e.key)){ e.preventDefault(); prevQuestion(); }
+  else if (e.key==="Escape"){ showTitle(); }
 });
 
 function openSettings(){ $("settings").classList.add("open"); loadVoices(); }
@@ -457,8 +636,45 @@ loadPrefs();
 $("rate").value = S.rate; $("pitch").value = S.pitch; $("secs").value = S.secs;
 $("rateV").textContent = S.rate.toFixed(2)+"배"; $("pitchV").textContent = S.pitch.toFixed(2);
 $("beepVol").value = S.beep; $("beepV").textContent = Math.round(S.beep*100)+"%";
+$("sfxVol").value = S.sfx; $("sfxV").textContent = Math.round(S.sfx*100)+"%";
+$("sfxVol").oninput = e => { S.sfx = +e.target.value; $("sfxV").textContent = Math.round(S.sfx*100)+"%"; if (sndEl.intro && !sndEl.intro.paused) sndEl.intro.volume = S.sfx*0.8; };
 goIdle();
 showSource();
+$("gateForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  audioUnlock(); $("gateBtn").disabled = true; $("gateMsg").textContent = "";
+  try{ await unlock($("gatePw").value); }
+  catch(err){ $("gateMsg").textContent = "비밀번호가 맞지 않습니다."; $("gatePw").select(); }
+  $("gateBtn").disabled = false;
+});
+/* ---------- 히든 메뉴: 비밀번호 바꾸기 ---------- */
+const toB64 = u8 => { let s=""; for (let i=0;i<u8.length;i+=0x8000) s += String.fromCharCode.apply(null, u8.subarray(i,i+0x8000)); return btoa(s); };
+async function encryptText(text, pw){
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iter = 250000;
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:iter, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt"]);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, new TextEncoder().encode(text)));
+  return JSON.stringify({v:1, iter, salt:toB64(salt), iv:toB64(iv), ct:toB64(ct)});
+}
+function openPwMenu(){ ["pwOld","pwNew","pwNew2"].forEach(id=>$(id).value=""); $("pwMsg").textContent=""; $("pwMenu").classList.add("open"); $("pwOld").focus(); }
+function closePwMenu(){ $("pwMenu").classList.remove("open"); }
+$("pwCancel").onclick = closePwMenu;
+$("pwMake").onclick = async () => {
+  const m = $("pwMsg"), o = $("pwOld").value, n = $("pwNew").value, n2 = $("pwNew2").value;
+  if (o !== CUR_PW){ m.innerHTML = '<span style="color:var(--red)">지금 비밀번호가 맞지 않습니다.</span>'; return; }
+  if (!n){ m.innerHTML = '<span style="color:var(--red)">새 비밀번호를 입력해 주세요.</span>'; return; }
+  if (n !== n2){ m.innerHTML = '<span style="color:var(--red)">새 비밀번호 두 칸이 서로 다릅니다.</span>'; return; }
+  m.textContent = "암호화하는 중…";
+  const save = (json, name) => { const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([json], {type:"application/json"}));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+  save(await encryptText(PLAIN, n), "questions.enc.json");
+  if (SOUND_PLAIN){ await new Promise(r=>setTimeout(r,600)); save(await encryptText(SOUND_PLAIN, n), "sound.enc.json"); }
+  m.innerHTML = SOUND_PLAIN
+    ? '<b>questions.enc.json</b>, <b>sound.enc.json</b> 두 파일을 내려받았습니다. GitHub에 함께 올려 기존 파일을 교체해 주세요.'
+    : '<b>questions.enc.json</b> 파일을 내려받았습니다. GitHub에 올려 기존 파일을 교체해 주세요.';
+};
+
 loadQuestionFile();
 </script>
 </body>
