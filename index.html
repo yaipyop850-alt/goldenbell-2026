@@ -117,6 +117,9 @@
   .revtag{display:inline-block;background:#b9411f;color:#fff;font-size:.55em;padding:.15em .6em;border-radius:999px;margin-right:.4em;vertical-align:middle}
   body.revival .qno{color:#ff9b6b}
   body.revival{box-shadow:inset 0 0 0 6px #b9411f}
+  .drop{display:block;border:2px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--muted);cursor:pointer;font-size:17px}
+  .drop:hover,.drop.over{border-color:var(--gold);color:var(--text)}
+  .hid{background:#5b4a12;color:#ffe2a3;border-radius:4px;padding:0 3px}
   .sheet-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
 </style>
 </head>
@@ -232,15 +235,18 @@
 
 <div class="overlay" id="importer">
   <div class="sheet wide">
-    <h2>문항 등록 — 엑셀 표 붙여넣기</h2>
-    <p class="hint">엑셀에서 <b>과목 · 분야 · 문제 · 정답</b> 열을 머리글 행까지 함께 복사해 붙여넣으세요. (해설 열이 따로 있으면 함께 복사해도 됩니다)<br>
-    · 문제 앞의 <b>(O, X)</b> 표시는 자동으로 OX 문제로 인식합니다.<br>
-    · <b>구분</b> 열에 '패자부활'이라고 적은 문항은 패자부활전 전용 문항으로 따로 모입니다.<br>
-    · 정답 칸의 괄호 안 내용 — 예: <b>X (2026년 최저시급은 10,320원)</b> — 은 해설로 분리합니다.</p>
-    <textarea id="pasteArea" placeholder="여기에 붙여넣기 (Ctrl+V)"></textarea>
-    <div class="pstatus" id="pStatus">붙여넣으면 아래에 미리보기가 나타납니다.</div>
+    <h2>문항 등록 — 엑셀 파일 올리기</h2>
+    <p class="hint">열 순서: <b>A 문항번호 · B 분야 · C 문제 · D 정답 · E 해설 · F 지시</b> (1행은 머리글, E·F는 비워도 됨)<br>
+    · 시트 이름에 <b>'패자부활'</b>이 들어간 시트의 문항은 패자부활전 문항이 됩니다.<br>
+    · 문제 앞의 <b>(O, X)</b>는 OX 문제로, 정답 칸 괄호 속 내용은 해설로 인식합니다.<br>
+    · 지시 칸에 <b>"문구"는 화면에 표시하지 않음</b>처럼 쓰면, 그 문구는 읽기만 하고 화면에서는 가립니다.<br>
+    · 등록하면 <b>기존 문항은 모두 지워지고</b> 이 PC 브라우저에 저장됩니다.</p>
+    <label class="drop" id="dropZone"><input type="file" id="xlsxFile" accept=".xlsx,.xls" hidden>
+      📂 엑셀 파일을 끌어다 놓거나 <u>여기를 눌러 선택</u></label>
+    <div class="pstatus" id="pStatus"></div>
     <div class="ptable-wrap" id="pWrap" style="display:none"><table class="pt" id="pTable"></table></div>
     <div class="sheet-actions" style="margin-top:16px">
+      <button class="sub-btn" id="resetUpload" style="margin-right:auto">↺ 기본 문항으로 되돌리기</button>
       <button class="sub-btn" id="cancelImport">취소</button>
       <button class="main-btn" style="min-width:0;padding:14px 26px;font-size:18px" id="doImport" disabled>등록하기</button>
     </div>
@@ -258,10 +264,10 @@ const SAMPLE = [
   }
 ];
 
-// 문항 우선순위: ① 저장소의 암호화된 문항 파일(questions.enc.json, 비밀번호로 해제) → ② 이 브라우저에 붙여넣은 문항 → ③ 예시 문항
+// 문항 우선순위: ① 이 PC에 엑셀로 등록한 문항 → ② 저장소의 암호화된 문항 파일(questions.enc.json, 비밀번호로 해제) → ③ 예시 문항
 let QUESTIONS = SAMPLE, SOURCE = "예시 문항";
-let __initial = SAMPLE;
-try{ const saved = JSON.parse(localStorage.getItem("gb_questions")||"null"); if (Array.isArray(saved) && saved.length){ __initial = saved; SOURCE = "붙여넣은 문항"; } }catch(e){}
+let __initial = SAMPLE, UPLOAD = null;
+try{ UPLOAD = JSON.parse(localStorage.getItem("gb_upload")||"null"); if (UPLOAD && UPLOAD.list && UPLOAD.list.length){ __initial = UPLOAD.list; SOURCE = UPLOAD.name || "엑셀 문항"; } else UPLOAD = null; }catch(e){}
 // 문항 파일은 비밀번호로 암호화(AES-GCM)되어 있어, 비밀번호 없이는 저장소에서도 내용을 볼 수 없음
 let ENC = null;
 const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -279,7 +285,11 @@ async function unlock(pw){
   PLAIN = text; CUR_PW = pw;
   loadSounds(pw);
   const list = buildQuestions(parseTSV(text)).filter(q => !q.errs.length).map(({errs,...q})=>q);
-  setAll(list); SOURCE = "문항 파일"; qi = 0; goIdle(); showSource();
+  // 이 PC에 엑셀로 등록한 문항이 있으면 그것을 우선 사용
+  let up = null; try{ up = JSON.parse(localStorage.getItem("gb_upload")||"null"); }catch(e){}
+  if (up && up.list && up.list.length){ setAll(up.list); SOURCE = up.name || "엑셀 문항"; }
+  else { setAll(list); SOURCE = "문항 파일"; }
+  qi = 0; goIdle(); showSource();
   try{ sessionStorage.setItem("gb_pw", pw); }catch(e){}   // 브라우저를 닫으면 사라짐
   $("gate").classList.add("hide");
 }
@@ -442,10 +452,18 @@ function introFade(){ const a = sndEl.intro; if (!a || a.paused) return; clearIn
 
 /* ---------- 말할 문장 만들기 ---------- */
 const sayOX = a => a.trim().toUpperCase() === "O" ? "오" : a.trim().toUpperCase() === "X" ? "엑스" : a;
+// 숫자 '1번'을 그대로 넘기면 일부 음성이 '1~~번'처럼 끌어 읽어서 한글 숫자로 바꿔 읽힘
+function hanNum(n){
+  const d = ["","일","이","삼","사","오","육","칠","팔","구"];
+  if (n < 10) return d[n] || "영";
+  const t = Math.floor(n/10), o = n%10;
+  if (n < 100) return (t>1?d[t]:"") + "십" + d[o];
+  return String(n);
+}
 function questionSpeech(q, n){
   const typeSay = q.type === "OX" ? "오엑스 문제입니다. " : "";
   const text = q.question.replace(/\[\[(.*?)\]\]/gs, "$1").replace(/_{2,}/g, " 빈칸 ");
-  return `${mode === "revival" ? "패자부활전, " : ""}${n}번 문제. ${typeSay}${text}`;
+  return `${mode === "revival" ? "패자부활전, " : ""}${hanNum(n)}번 문제. ${typeSay}${text}`;
 }
 function answerSpeech(q){
   let ex = (q.explanation||"").trim();
@@ -679,11 +697,11 @@ function normOX(a){
 }
 function buildQuestions(rows){
   if (!rows.length) return [];
-  let col = {subject:0, field:1, question:2, answer:3, explanation:4, kind:-1};
+  let col = {subject:0, field:1, question:2, answer:3, explanation:4, kind:-1, instr:-1};
   const h = rows[0].join("|");
   if (/문제|문항/.test(h)){
     const head = rows.shift(), find = re => head.findIndex(x=>re.test(x.replace(/\s/g,"")));
-    col = { subject:find(/과목/), field:find(/분야|영역/), question:find(/^(문제|문항)/), answer:find(/정답|답/), explanation:find(/해설|설명/), kind:find(/구분|패자|부활/) };
+    col = { subject:find(/과목/), field:find(/분야|영역/), question:find(/^(문제|문항)/), answer:find(/정답|답/), explanation:find(/해설|설명/), kind:find(/구분|패자|부활/), instr:find(/지시/) };
   }
   const get = (r,i) => (i>=0 && i<r.length) ? r[i] : "";
   return rows.map(r=>{
@@ -701,38 +719,93 @@ function buildQuestions(rows){
     if (!answer) errs.push("정답 없음");
     if (type==="OX" && !ox) errs.push("OX 정답이 O/X가 아님");
     const revival = /패자|부활/.test(get(r,col.kind));
-    return { subject:get(r,col.subject), field:get(r,col.field), type, question, answer, explanation, revival, errs };
+    // 지시사항: "따옴표 속 문구"를 화면에 표시하지 말라는 지시는 자동 처리(읽기만 하고 화면에서 가림)
+    const instr = get(r,col.instr).trim(); let instrOK = !instr;
+    if (instr && /(표시하지|숨기|숨김|숨겨|가려|가리|안\s*보이|보이지\s*않)/.test(instr)){
+      const phrases = [...instr.matchAll(/["“”'‘’「『]([^"“”'‘’」』]{2,})["“”'‘’」』]/g)].map(m=>m[1].trim());
+      for (const ph of phrases){
+        const re = new RegExp(`["“”'‘’]?${ph.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["“”'‘’]?`);
+        if (re.test(question) && !question.includes("[[")){ question = question.replace(re, m => `[[${m}]]`); instrOK = true; }
+      }
+    }
+    return { subject:get(r,col.subject), field:get(r,col.field), type, question, answer, explanation, revival, instr, instrOK, errs };
   });
 }
 let pending = [];
 const esc = s => String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function previewImport(){
-  pending = buildQuestions(parseTSV($("pasteArea").value));
-  delete $("doImport").dataset.confirm; $("doImport").textContent="등록하기";
-  const bad = pending.filter(q=>q.errs.length).length;
-  if (!pending.length){ $("pWrap").style.display="none"; $("pStatus").textContent="붙여넣으면 아래에 미리보기가 나타납니다."; $("doImport").disabled=true; return; }
-  $("pStatus").innerHTML = `<b>${pending.length}문항</b> 인식` + (bad ? ` · <span style="color:var(--red)">확인 필요 ${bad}건 (빨간 칸)</span>` : " · 모두 정상");
-  $("pTable").innerHTML = `<tr><th>#</th><th>과목</th><th>분야</th><th>유형</th><th>문제</th><th>정답</th><th>해설</th></tr>` +
-    pending.map((q,i)=>`<tr><td>${i+1}</td><td>${esc(q.subject)}</td><td>${esc(q.field)}</td><td>${esc(q.type)}</td>
-      <td${q.errs.includes("문제 없음")?' class="err"':''}>${esc(q.question)||"(비어 있음)"}</td>
-      <td${q.errs.some(e=>/정답/.test(e))?' class="err"':''}>${esc(q.answer)||"(비어 있음)"}${q.errs.filter(e=>/OX/.test(e)).length?"<br><small>O 또는 X여야 함</small>":""}</td>
-      <td>${esc(q.explanation)}</td></tr>`).join("");
-  $("pWrap").style.display="block";
-  $("doImport").disabled = false;
+/* ---------- 엑셀 파일 등록 (assets/xlsx.full.min.js 사용) ---------- */
+let xlsxReady = null;
+function loadXLSX(){
+  if (window.XLSX) return Promise.resolve();
+  if (!xlsxReady) xlsxReady = new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "assets/xlsx.full.min.js"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+  return xlsxReady;
 }
-function openImport(){ $("importer").classList.add("open"); $("pasteArea").focus(); }
-function closeImport(){ $("importer").classList.remove("open"); $("mainBtn").focus(); }
+async function readExcel(file){
+  await loadXLSX();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const rows = [["번호","분야","문제","정답","해설","지시","구분"]];
+  const body = [];
+  for (const name of wb.SheetNames){
+    const rev = /패자|부활/.test(name);
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: "", raw: false });
+    for (const r of data){
+      const c = i => String(r[i] ?? "").trim();
+      if (!c(2) && !c(3)) continue;                                   // 빈 줄
+      if (/문제|문항/.test(c(2)) && /정답/.test(c(3))) continue;       // 머리글
+      body.push({ n: parseFloat(c(0)), rev, row: [c(0), c(1), c(2), c(3), c(4), c(5), rev ? "패자부활" : ""] });
+    }
+  }
+  // 문항번호 순서대로 (번호가 없으면 원래 순서)
+  const sorted = body.map((x,i)=>({...x, i})).sort((x,y)=> (x.rev-y.rev) || ((isNaN(x.n)||isNaN(y.n)) ? x.i-y.i : x.n-y.n || x.i-y.i));
+  return buildQuestions(rows.concat(sorted.map(x=>x.row)));
+}
+function previewRender(list, fname){
+  const bad = list.filter(q=>q.errs.length).length, rev = list.filter(q=>q.revival).length;
+  const unk = list.filter(q=>!q.instrOK).length;
+  $("pStatus").innerHTML = `<b>${esc(fname)}</b> · 본 문제 <b>${list.length-rev}</b>` + (rev?` · 패자부활 <b>${rev}</b>`:"") +
+    (bad ? ` · <span style="color:var(--red)">확인 필요 ${bad}건</span>` : "") +
+    (unk ? ` · <span style="color:#ffb08a">자동 처리 못 한 지시 ${unk}건 (사회자 참고)</span>` : "");
+  let n = 0, m = 0;
+  $("pTable").innerHTML = `<tr><th>#</th><th>분야</th><th>유형</th><th>문제</th><th>정답</th><th>해설</th><th>지시</th></tr>` +
+    list.map(q=>`<tr><td>${q.revival ? "부활 "+(++m) : (++n)}</td><td>${esc(q.field)}</td><td>${esc(q.type)}</td>
+      <td${q.errs.includes("문제 없음")?' class="err"':''}>${esc(q.question).replace(/\[\[(.*?)\]\]/gs,'<span class="hid" title="화면에서 가림">$1</span>')||"(비어 있음)"}</td>
+      <td${q.errs.some(e=>/정답/.test(e))?' class="err"':''}>${esc(q.answer)||"(비어 있음)"}${q.errs.some(e=>/OX/.test(e))?"<br><small>O 또는 X여야 함</small>":""}</td>
+      <td>${esc(q.explanation)}</td>
+      <td>${q.instr ? (q.instrOK ? '<span style="color:#9be7b5">✔ 화면 가림 적용</span>' : `<span style="color:#ffb08a">⚠ 자동 처리 안 됨</span><br><small>${esc(q.instr)}</small>`) : ""}</td></tr>`).join("");
+  $("pWrap").style.display = "block";
+  $("doImport").disabled = !list.length;
+  $("doImport").textContent = "기존 문항 지우고 등록";
+}
+async function takeFile(f){
+  if (!f) return;
+  $("pStatus").textContent = "읽는 중…"; $("pWrap").style.display = "none"; $("doImport").disabled = true;
+  try{ pending = await readExcel(f); pending.fname = f.name; previewRender(pending, f.name); }
+  catch(e){ $("pStatus").innerHTML = '<span style="color:var(--red)">엑셀 파일을 읽지 못했습니다. .xlsx 파일인지 확인해 주세요.</span>'; }
+}
+function openImport(){ pending = []; $("pStatus").textContent = ""; $("pWrap").style.display = "none"; $("doImport").disabled = true; $("doImport").textContent = "기존 문항 지우고 등록"; $("xlsxFile").value = ""; $("importer").classList.add("open"); loadXLSX().catch(()=>{}); }
+function closeImport(){ $("importer").classList.remove("open"); }
 $("openImport").onclick = openImport;
 $("cancelImport").onclick = closeImport;
-$("pasteArea").addEventListener("input", previewImport);
+$("xlsxFile").addEventListener("change", e => takeFile(e.target.files[0]));
+const dz = $("dropZone");
+dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("over"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("over"));
+dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("over"); takeFile(e.dataTransfer.files[0]); });
 $("doImport").onclick = () => {
   const bad = pending.filter(q=>q.errs.length).length;
   if (bad && !$("doImport").dataset.confirm){ $("doImport").dataset.confirm="1"; $("doImport").textContent=`확인 필요 ${bad}건 포함해 등록`; return; }
-  delete $("doImport").dataset.confirm; $("doImport").textContent="등록하기";
-  setAll(pending.map(({errs,...q})=>q));
-  try{ localStorage.setItem("gb_questions", JSON.stringify(QUESTIONS)); }catch(e){}
-  SOURCE = "붙여넣은 문항"; showSource();
-  closeImport(); qi = 0; goIdle();
+  delete $("doImport").dataset.confirm;
+  const list = pending.map(({errs,...q})=>q);
+  setAll(list);
+  SOURCE = "엑셀 문항(" + (pending.fname||"") + ")";
+  try{ localStorage.setItem("gb_upload", JSON.stringify({ list, name: SOURCE })); localStorage.removeItem("gb_pos"); }catch(e){}
+  showSource(); closeImport(); qi = 0; goIdle(); toast(`기존 문항을 지우고 본 문제 ${MAIN.length}문항` + (REV.length?`, 패자부활 ${REV.length}문항`:"") + `을 등록했습니다.`);
+};
+$("resetUpload").onclick = () => {
+  try{ localStorage.removeItem("gb_upload"); localStorage.removeItem("gb_questions"); localStorage.removeItem("gb_pos"); }catch(e){}
+  if (PLAIN){ setAll(buildQuestions(parseTSV(PLAIN)).filter(q=>!q.errs.length).map(({errs,...q})=>q)); SOURCE = "문항 파일"; }
+  else { setAll(SAMPLE); SOURCE = "예시 문항"; }
+  showSource(); closeImport(); qi = 0; goIdle(); toast("기본 문항으로 되돌렸습니다.");
 };
 
 loadPrefs();
