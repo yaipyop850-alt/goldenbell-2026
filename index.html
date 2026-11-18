@@ -72,11 +72,13 @@
   #introVideo{width:100%;height:100%;object-fit:contain;background:#000;display:none}
   #introV .vtip{position:absolute;right:14px;bottom:10px;color:rgba(255,255,255,.18);font-size:12px}
   /* 오프닝 타이틀 */
-  #title{position:fixed;inset:0;z-index:20;background:#173d2d;display:flex;align-items:center;justify-content:center;gap:4vw;cursor:pointer}
+  #title{position:fixed;inset:0;z-index:20;background:#173d2d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3vh;cursor:pointer}
+  #title .emblems{display:flex;align-items:center;justify-content:space-between;width:min(56vw,88vh);padding:0 4%;box-sizing:border-box}
   #title.hide{display:none}
-  #title .emblem{height:min(42vh,32vw);animation:rise .9s ease-out both;
+  #title .emblem{height:min(24vh,17vw);animation:rise .9s .5s ease-out both;
     filter:drop-shadow(0 0 1.5px rgba(255,255,255,.95)) drop-shadow(0 0 14px rgba(255,255,255,.45))}
-  #title .logo{width:min(58vw,105vh);animation:pop 1s .25s cubic-bezier(.2,1.4,.4,1) both}
+  #title .logo{width:min(56vw,88vh);animation:pop 1s cubic-bezier(.2,1.4,.4,1) both}
+  #title .emblem.e2{animation-delay:.75s}
   #titleJump{position:absolute;right:16px;bottom:12px;background:transparent;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.35);border-radius:8px;padding:4px 10px;font-size:13px;cursor:pointer;font-family:inherit;z-index:1}
   #titleJump:hover{color:#fff;border-color:rgba(255,255,255,.6)}
   #title .tip{position:absolute;bottom:2.5vh;left:0;right:0;text-align:center;color:rgba(255,255,255,.28);font-size:15px}
@@ -136,11 +138,14 @@
 <div id="introV" class="hide">
   <div id="introCount"></div>
   <video id="introVideo" src="assets/intro.mp4" preload="auto" playsinline></video>
-  <div class="vtip">Esc · → : 영상 건너뛰기</div>
+  <div class="vtip">Esc · → · PageDown : 영상 건너뛰기</div>
 </div>
 <div id="title">
-  <img class="emblem" src="assets/emblem.png" alt="학교 상징">
   <img class="logo" src="assets/logo.png" alt="도전! 골든벨">
+  <div class="emblems">
+    <img class="emblem" src="assets/emblem.png" alt="주최 학교 교표">
+    <img class="emblem e2" src="assets/emblem2.png" alt="참가 학교 교표">
+  </div>
   <button id="titleJump" title="문항 이동 (창이 닫혔을 때 이어 하기)">🔢 문항 이동</button>
   <div class="tip">Space · → · 클릭: 인트로 음악 → 한 번 더: 1번 문제로 &nbsp;|&nbsp; Esc: 이 화면으로 돌아오기</div>
 </div>
@@ -240,6 +245,7 @@
     · 시트 이름에 <b>'패자부활'</b>이 들어간 시트의 문항은 패자부활전 문항이 됩니다.<br>
     · 문제 앞의 <b>(O, X)</b>는 OX 문제로, 정답 칸 괄호 속 내용은 해설로 인식합니다.<br>
     · 지시 칸에 <b>"문구"는 화면에 표시하지 않음</b>처럼 쓰면, 그 문구는 읽기만 하고 화면에서는 가립니다.<br>
+    · 지시 칸에 <b>받아쓰기 "문구"</b>라고 쓰면 화면에서 가리고 두 번 읽습니다. (<b>"문구" 두 번 읽기</b>는 가리지 않고 두 번만 읽음)<br>
     · 등록하면 <b>기존 문항은 모두 지워지고</b> 이 PC 브라우저에 저장됩니다.</p>
     <label class="drop" id="dropZone"><input type="file" id="xlsxFile" accept=".xlsx,.xls" hidden>
       📂 엑셀 파일을 끌어다 놓거나 <u>여기를 눌러 선택</u></label>
@@ -463,7 +469,8 @@ function hanNum(n){
 function questionSpeech(q, n){
   const typeSay = q.type === "OX" ? "오엑스 문제입니다. " : "";
   const text = q.question.replace(/\[\[(.*?)\]\]/gs, "$1").replace(/_{2,}/g, " 빈칸 ");
-  return `${mode === "revival" ? "패자부활전, " : ""}${hanNum(n)}번 문제. ${typeSay}${text}`;
+  const again = (q.repeat && q.repeat.length) ? ` 다시 한 번 읽겠습니다. ${q.repeat.join(". ")}.` : "";
+  return `${mode === "revival" ? "패자부활전, " : ""}${hanNum(n)}번 문제. ${typeSay}${text}${again}`;
 }
 function answerSpeech(q){
   let ex = (q.explanation||"").trim();
@@ -638,7 +645,7 @@ function leaveTitle(){
 }
 $("title").onclick = leaveTitle;
 document.addEventListener("keydown", e=>{
-  if (introActive){ if (["Escape","ArrowRight"].includes(e.key)){ e.preventDefault(); endIntro(); } else if (e.key===" ") e.preventDefault(); return; }
+  if (introActive){ if (["Escape","ArrowRight","PageDown"].includes(e.key)){ e.preventDefault(); endIntro(); } else if (e.key===" ") e.preventDefault(); return; }
   // 히든 메뉴: Ctrl + Shift + P (문항을 연 뒤에만)
   if (e.ctrlKey && e.shiftKey && (e.key==="P"||e.key==="p"||e.code==="KeyP")){ e.preventDefault(); if (PLAIN) openPwMenu(); return; }
   if ($("pwMenu").classList.contains("open")){ if (e.key==="Escape") closePwMenu(); return; }
@@ -652,6 +659,7 @@ document.addEventListener("keydown", e=>{
   if (!$("gate").classList.contains("hide")) return;
   if (!$("title").classList.contains("hide")){
     if ([" ","Enter","ArrowRight","PageDown"].includes(e.key)){ e.preventDefault(); leaveTitle(); }
+    else if (e.key==="PageUp") e.preventDefault();
     return;
   }
   if ($("settings").classList.contains("open")) { if (e.key==="Escape") closeSettings(); return; }
@@ -728,7 +736,25 @@ function buildQuestions(rows){
         if (re.test(question) && !question.includes("[[")){ question = question.replace(re, m => `[[${m}]]`); instrOK = true; }
       }
     }
-    return { subject:get(r,col.subject), field:get(r,col.field), type, question, answer, explanation, revival, instr, instrOK, errs };
+    // 받아쓰기 / 두 번 읽기: 따옴표 속 문장을 한 번 더 읽음 (받아쓰기는 화면에서도 가림)
+    let repeat = [];
+    if (instr && /(받아쓰기|두\s*번|2\s*번|반복)/.test(instr)){
+      const qre = /["“”'‘’「『]([^"“”'‘’」』]{2,})["“”'‘’」』]/g;
+      // 지시 칸에 따옴표 문장이 있으면 그것을, 없으면 문제 속 따옴표 문장을 사용
+      let phrases = [...instr.matchAll(qre)].map(m=>m[1].trim()).filter(ph=>question.includes(ph));
+      if (!phrases.length) phrases = [...question.matchAll(qre)].map(m=>m[1].trim());
+      if (phrases.length){
+        repeat = phrases;
+        if (/받아쓰기/.test(instr) && !question.includes("[[")){
+          for (const ph of phrases){
+            const re = new RegExp(`["“”'‘’]?${ph.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["“”'‘’]?`);
+            question = question.replace(re, m => `[[${m}]]`);
+          }
+        }
+        instrOK = true;
+      }
+    }
+    return { subject:get(r,col.subject), field:get(r,col.field), type, question, answer, explanation, revival, instr, instrOK, repeat, errs };
   });
 }
 let pending = [];
@@ -771,7 +797,7 @@ function previewRender(list, fname){
       <td${q.errs.includes("문제 없음")?' class="err"':''}>${esc(q.question).replace(/\[\[(.*?)\]\]/gs,'<span class="hid" title="화면에서 가림">$1</span>')||"(비어 있음)"}</td>
       <td${q.errs.some(e=>/정답/.test(e))?' class="err"':''}>${esc(q.answer)||"(비어 있음)"}${q.errs.some(e=>/OX/.test(e))?"<br><small>O 또는 X여야 함</small>":""}</td>
       <td>${esc(q.explanation)}</td>
-      <td>${q.instr ? (q.instrOK ? '<span style="color:#9be7b5">✔ 화면 가림 적용</span>' : `<span style="color:#ffb08a">⚠ 자동 처리 안 됨</span><br><small>${esc(q.instr)}</small>`) : ""}</td></tr>`).join("");
+      <td>${q.instr ? (q.instrOK ? `<span style="color:#9be7b5">✔ ${[q.question.includes("[[")?"화면 가림":"", (q.repeat&&q.repeat.length)?"두 번 읽기":""].filter(Boolean).join(" · ")} 적용</span>` : `<span style="color:#ffb08a">⚠ 자동 처리 안 됨</span><br><small>${esc(q.instr)}</small>`) : ""}</td></tr>`).join("");
   $("pWrap").style.display = "block";
   $("doImport").disabled = !list.length;
   $("doImport").textContent = "기존 문항 지우고 등록";
