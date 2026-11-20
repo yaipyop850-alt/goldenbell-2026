@@ -187,7 +187,11 @@
       <select id="voiceSel"></select>
     </div>
     <div class="row">
-      <label>영어 문장을 읽을 목소리 <span id="enCount"></span></label>
+      <label>영어 표현이 있는 문항의 목소리</label>
+      <select id="mlVoiceSel"></select>
+    </div>
+    <div class="row">
+      <label>영어 문장을 읽을 목소리 (위에서 '기본 목소리'를 고른 경우) <span id="enCount"></span></label>
       <select id="enVoiceSel"></select>
     </div>
     <div class="row">
@@ -342,13 +346,13 @@ function showSource(){ const el = document.getElementById("srcInfo"); if (el) el
 
 /* ---------- 상태 ---------- */
 // idle → reading → countdown → call(정답판 대기) → reveal
-let qi = 0, state = "idle", timer = null, remain = 0, lastSpeech = "";
+let qi = 0, state = "idle", timer = null, remain = 0, lastSpeech = "", lastVoice = null;
 const $ = id => document.getElementById(id);
 const S = { voice: null, rate: 0.9, pitch: 1, secs: 10, beep: 0.6, sfx: 0.8 };
 
 /* ---------- 설정 저장(브라우저별) ---------- */
-function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx}); S.enVoiceName = p.enVoiceName; S.voiceName = p.voiceName; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,enVoiceName:(S.enVoice?S.enVoice.name:(S.enVoiceName||"")),voiceName:S.voice&&S.voice.name})); }catch(e){} }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx}); S.enVoiceName = p.enVoiceName; S.mlVoiceName = p.mlVoiceName; S.voiceName = p.voiceName; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,enVoiceName:(S.enVoice?S.enVoice.name:(S.enVoiceName||"")),mlVoiceName:(S.mlVoice?S.mlVoice.name:(S.mlVoiceName||"")),voiceName:S.voice&&S.voice.name})); }catch(e){} }
 
 /* ---------- 음성 ---------- */
 const synth = window.speechSynthesis;
@@ -357,7 +361,8 @@ let voices = [], currentUtter = null;
 function rankVoice(v){
   let s = 0;
   if (/natural/i.test(v.name)) s += 10;   // Edge 고품질 음성
-  if (/sunhi/i.test(v.name)) s += 3;
+  if (/sunhi|선희/i.test(v.name)) s += 3;
+  if (/multilingual/i.test(v.name)) s -= 5;   // 다국어 목소리는 기본값에서 뒤로
   if (/online/i.test(v.name)) s += 1;
   return s;
 }
@@ -387,11 +392,22 @@ function loadVoices(){
   enVoices.forEach((v,i)=>{ const o = document.createElement("option"); o.value = i;
     o.textContent = v.name.replace(/ - English.*$/,"") + (/natural/i.test(v.name) ? "  ★고품질" : ""); es.appendChild(o); });
   $("enCount").textContent = enVoices.length ? `영어 ${enVoices.length}개` : "(영어 목소리 없음)";
+  const ms = $("mlVoiceSel"); ms.innerHTML = '<option value="-1">기본 목소리 그대로 (영어 문장만 영어 목소리로)</option>';
+  voices.forEach((v,i)=>{ const o = document.createElement("option"); o.value = i; o.textContent = v.name.replace(/ - Korean \(Korea\)/,""); ms.appendChild(o); });
+  let mp = S.mlVoiceName === "none" ? -1 : voices.findIndex(v => v.name === S.mlVoiceName);
+  if (mp < 0 && S.mlVoiceName !== "none") mp = voices.findIndex(v => /hyunsu|현수/i.test(v.name) && /multilingual/i.test(v.name));
+  if (mp < 0 && S.mlVoiceName !== "none") mp = voices.findIndex(v => /multilingual/i.test(v.name));
+  ms.value = mp; S.mlVoice = mp >= 0 ? voices[mp] : null;
+  // 기본 목소리: 다국어 목소리를 피하고 선희 우선
+  if (!S.voiceName){ const sh = voices.findIndex(v => /sunhi|선희/i.test(v.name)); if (sh >= 0){ sel.value = sh; S.voice = voices[sh]; } }
   let ep = S.enVoiceName === "none" ? -1 : enVoices.findIndex(v => v.name === S.enVoiceName);
   if (ep < 0 && S.enVoiceName !== "none") ep = enVoices.length ? 0 : -1;
   es.value = ep; S.enVoice = ep >= 0 ? enVoices[ep] : null;
 }
 let enVoices = [];
+// 영어 표현이 있는 문항은 '영어 포함 문항 목소리'(기본: 현수 Multilingual), 나머지는 기본 목소리
+function hasEnglish(q){ return /[A-Za-z]{2,}/.test(sayFix([q.question, q.answer, q.explanation].join(" ").replace(/\[\[|\]\]/g,""))); }
+function voiceFor(q){ return (S.mlVoice && hasEnglish(q)) ? S.mlVoice : null; }
 if (synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
 
 /* ---------- 읽기 전 다듬기 ---------- */
@@ -407,15 +423,16 @@ function sayFix(t){
     const jj = {"는":"은","가":"이","를":"을","와":"과","로":"으로"}[j] || j;
     return ` ${n}번${jj}`;
   });
-  return t.replace(/\s+,/g, ",").replace(/[ \t]{2,}/g, " ");
+  t = t.replace(/\s*[·・‧∙]\s*/g, ", ");          // 가운뎃점 → 쉼
+  return t.replace(/\s+,/g, ",").replace(/,\s*,/g, ",").replace(/[ \t]{2,}/g, " ");
 }
 // 영어 구간을 나눔: 영어 목소리가 있으면 영어 구간만 영어 목소리로
-function splitLang(t){
-  if (!S.enVoice) return [{ t, en:false }];
+function splitLang(t, whole){
+  if (whole || !S.enVoice) return [{ t, en:false }];
   const out = [], re = /[A-Za-z][A-Za-z'’\-]*(?:[ ,.!?;:]+[A-Za-z][A-Za-z'’\-]*)*[.!?]?/g;
   let last = 0, m;
   while ((m = re.exec(t))){
-    if (m[0].replace(/[^A-Za-z]/g,"").length < 2){ continue; }   // 한 글자 영어(O, X 등)는 한국어로
+    if ((m[0].match(/[A-Za-z][A-Za-z'’\-]*/g) || []).length < 3){ continue; }   // 세 단어 이상인 영어 문장만 영어 목소리로
     if (m.index > last) out.push({ t: t.slice(last, m.index), en:false });
     out.push({ t: m[0], en:true }); last = m.index + m[0].length;
   }
@@ -425,11 +442,13 @@ function splitLang(t){
 let speakToken = 0;
 function speak(text, opts = {}){
   return new Promise(resolve=>{
-    if (!opts.ment) lastSpeech = text;     // 진행 멘트는 '다시 읽기' 대상에서 제외
+    if (!opts.ment){ lastSpeech = text; lastVoice = opts.voice || null; }   // 진행 멘트는 '다시 읽기' 대상에서 제외
     if (!synth){ resolve(); return; }
     synth.cancel();
     const my = ++speakToken;
-    const parts = splitLang(sayFix(text));
+    const vMain = opts.voice || S.voice;
+    const multi = vMain && /multilingual/i.test(vMain.name);      // 다국어 목소리는 한 번에 읽음
+    const parts = splitLang(sayFix(text), multi);
     const rate = S.rate * (opts.rateMul || 1), pitch = Math.min(2, S.pitch * (opts.pitchMul || 1));
     let done = false;
     const finish = () => { if (!done){ done = true; clearTimeout(safety); setSpeaking(false); resolve(); } };
@@ -439,7 +458,7 @@ function speak(text, opts = {}){
     parts.forEach((p, i) => {
       const u = new SpeechSynthesisUtterance(p.t);
       if (p.en){ u.voice = S.enVoice; u.lang = S.enVoice.lang; }
-      else { if (S.voice) u.voice = S.voice; u.lang = "ko-KR"; }
+      else { if (vMain) u.voice = vMain; u.lang = "ko-KR"; }
       u.rate = rate; u.pitch = pitch;
       if (i === parts.length - 1){ u.onend = finish; u.onerror = finish; }
       else u.onerror = () => { if (my !== speakToken) finish(); };
@@ -598,7 +617,7 @@ function goManual(){        // 사람이 직접 읽는 경우: 문제 낭독만 
   if (state !== "idle") return;
   const id = ++run;
   state = "reading";
-  lastSpeech = questionSpeech(QUESTIONS[qi], qi+1);
+  lastSpeech = questionSpeech(QUESTIONS[qi], qi+1); lastVoice = voiceFor(QUESTIONS[qi]);
   $("question").style.visibility = "visible";
   $("manualBtn").style.display = "none";
   afterRead(id);
@@ -610,7 +629,7 @@ async function goReading(){
   $("question").style.visibility = "visible";
   setStage(`<div class="speaking"><span class="dot"></span>문제를 읽고 있습니다</div>`);
   setMain("읽는 중…", true);
-  await speak(questionSpeech(QUESTIONS[qi], qi+1));
+  await speak(questionSpeech(QUESTIONS[qi], qi+1), { voice: voiceFor(QUESTIONS[qi]) });
   if (alive(id)) afterRead(id);
 }
 function goCountdown(){
@@ -647,7 +666,7 @@ async function goReveal(){
   const al = q.answer.length, acls = al > 10 ? "l" : al > 5 ? "m" : "";
   setStage(`<div class="answer">정답<b class="${acls}">${esc(q.answer)}</b></div><div class="expl">${esc(q.explanation||"")}</div>`);
   setMain(qi < QUESTIONS.length-1 ? "다음 문제 ▶" : "마지막 문제 · 1번으로");
-  await speak(answerSpeech(q));
+  await speak(answerSpeech(q), { voice: voiceFor(q) });
 }
 function next(){
   if (state === "idle") goReading();
@@ -662,7 +681,7 @@ function next(){
 /* ---------- 이벤트 ---------- */
 $("mainBtn").onclick = () => { audioUnlock(); next(); };
 $("manualBtn").onclick = () => { audioUnlock(); goManual(); };
-$("replayBtn").onclick = () => { if (lastSpeech && state !== "countdown") speak(lastSpeech); };
+$("replayBtn").onclick = () => { if (lastSpeech && state !== "countdown") speak(lastSpeech, { voice: lastVoice }); };
 $("resetBtn").onclick = () => { qi = 0; goIdle(); };
 $("revBtn").onclick = enterRevival;
 // 푸터 버튼은 클릭해도 포커스를 가져가지 않음 (스페이스바가 버튼을 누르는 사고 방지)
@@ -735,6 +754,7 @@ function closeSettings(){ $("settings").classList.remove("open"); savePrefs(); $
 $("openSettings").onclick = openSettings;
 $("closeSettings").onclick = closeSettings;
 $("voiceSel").onchange = e => { S.voice = voices[+e.target.value]; };
+$("mlVoiceSel").onchange = e => { const i = +e.target.value; S.mlVoice = i >= 0 ? voices[i] : null; S.mlVoiceName = i >= 0 ? voices[i].name : "none"; };
 $("enVoiceSel").onchange = e => { const i = +e.target.value; S.enVoice = i >= 0 ? enVoices[i] : null; S.enVoiceName = i >= 0 ? enVoices[i].name : "none"; };
 $("rate").oninput = e => { S.rate = +e.target.value; $("rateV").textContent = S.rate.toFixed(2)+"배"; };
 $("pitch").oninput = e => { S.pitch = +e.target.value; $("pitchV").textContent = S.pitch.toFixed(2); };
