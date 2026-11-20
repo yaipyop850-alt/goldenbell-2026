@@ -87,7 +87,7 @@
   /* settings */
   .overlay{position:fixed;inset:0;background:rgba(4,16,10,.72);display:none;align-items:center;justify-content:center;z-index:30}
   .overlay.open{display:flex}
-  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px 28px;width:min(560px,92vw);text-align:left}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px 28px;width:min(560px,92vw);text-align:left;max-height:92vh;overflow-y:auto}
   .sheet h2{margin:0 0 18px;font-size:22px}
   .row{margin-bottom:18px}
   .row label{display:flex;justify-content:space-between;color:var(--muted);font-size:15px;margin-bottom:8px}
@@ -195,8 +195,12 @@
       <select id="enVoiceSel"></select>
     </div>
     <div class="row">
-      <label>읽기 속도 <span id="rateV"></span></label>
+      <label>한국어 읽기 속도 <span id="rateV"></span></label>
       <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.9">
+    </div>
+    <div class="row">
+      <label>영어 읽기 속도 <span id="enRateV"></span></label>
+      <input type="range" id="enRate" min="0.6" max="1.4" step="0.05" value="0.9">
     </div>
     <div class="row">
       <label>목소리 높낮이 <span id="pitchV"></span></label>
@@ -348,11 +352,11 @@ function showSource(){ const el = document.getElementById("srcInfo"); if (el) el
 // idle → reading → countdown → call(정답판 대기) → reveal
 let qi = 0, state = "idle", timer = null, remain = 0, lastSpeech = "", lastVoice = null;
 const $ = id => document.getElementById(id);
-const S = { voice: null, rate: 0.9, pitch: 1, secs: 10, beep: 0.6, sfx: 0.8 };
+const S = { voice: null, rate: 0.9, enRate: 0.9, pitch: 1, secs: 10, beep: 0.6, sfx: 0.8 };
 
 /* ---------- 설정 저장(브라우저별) ---------- */
-function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx}); S.enVoiceName = p.enVoiceName; S.mlVoiceName = p.mlVoiceName; S.voiceName = p.voiceName; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,enVoiceName:(S.enVoice?S.enVoice.name:(S.enVoiceName||"")),mlVoiceName:(S.mlVoice?S.mlVoice.name:(S.mlVoiceName||"")),voiceName:S.voice&&S.voice.name})); }catch(e){} }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx, enRate:p.enRate??S.enRate}); S.enVoiceName = p.enVoiceName; S.mlVoiceName = p.mlVoiceName; S.voiceName = p.voiceName; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,enRate:S.enRate,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,enVoiceName:(S.enVoice?S.enVoice.name:(S.enVoiceName||"")),mlVoiceName:(S.mlVoice?S.mlVoice.name:(S.mlVoiceName||"")),voiceName:S.voice&&S.voice.name})); }catch(e){} }
 
 /* ---------- 음성 ---------- */
 const synth = window.speechSynthesis;
@@ -427,8 +431,8 @@ function sayFix(t){
   return t.replace(/\s+,/g, ",").replace(/,\s*,/g, ",").replace(/[ \t]{2,}/g, " ");
 }
 // 영어 구간을 나눔: 영어 목소리가 있으면 영어 구간만 영어 목소리로
-function splitLang(t, whole){
-  if (whole || !S.enVoice) return [{ t, en:false }];
+function splitLang(t, multi){
+  if (!multi && !S.enVoice) return [{ t, en:false }];
   const out = [], re = /[A-Za-z][A-Za-z'’\-]*(?:[ ,.!?;:]+[A-Za-z][A-Za-z'’\-]*)*[.!?]?/g;
   let last = 0, m;
   while ((m = re.exec(t))){
@@ -447,7 +451,7 @@ function speak(text, opts = {}){
     synth.cancel();
     const my = ++speakToken;
     const vMain = opts.voice || S.voice;
-    const multi = vMain && /multilingual/i.test(vMain.name);      // 다국어 목소리는 한 번에 읽음
+    const multi = !!(vMain && /multilingual/i.test(vMain.name));  // 다국어 목소리: 목소리는 그대로, 영어 문장만 영어 속도로
     const parts = splitLang(sayFix(text), multi);
     const rate = S.rate * (opts.rateMul || 1), pitch = Math.min(2, S.pitch * (opts.pitchMul || 1));
     let done = false;
@@ -457,9 +461,10 @@ function speak(text, opts = {}){
     currentUtter = [];   // 가비지 컬렉션으로 onend가 사라지는 문제 방지
     parts.forEach((p, i) => {
       const u = new SpeechSynthesisUtterance(p.t);
-      if (p.en){ u.voice = S.enVoice; u.lang = S.enVoice.lang; }
+      // 영어 구간: 다국어 목소리(현수)면 같은 목소리, 아니면 영어 목소리 — 속도는 '영어 읽기 속도'
+      if (p.en){ const ev = multi ? vMain : S.enVoice; u.voice = ev; u.lang = multi ? "en-US" : ev.lang; }
       else { if (vMain) u.voice = vMain; u.lang = "ko-KR"; }
-      u.rate = rate; u.pitch = pitch;
+      u.rate = p.en ? S.enRate * (opts.rateMul || 1) : rate; u.pitch = pitch;
       if (i === parts.length - 1){ u.onend = finish; u.onerror = finish; }
       else u.onerror = () => { if (my !== speakToken) finish(); };
       currentUtter.push(u);
@@ -756,6 +761,7 @@ $("closeSettings").onclick = closeSettings;
 $("voiceSel").onchange = e => { S.voice = voices[+e.target.value]; };
 $("mlVoiceSel").onchange = e => { const i = +e.target.value; S.mlVoice = i >= 0 ? voices[i] : null; S.mlVoiceName = i >= 0 ? voices[i].name : "none"; };
 $("enVoiceSel").onchange = e => { const i = +e.target.value; S.enVoice = i >= 0 ? enVoices[i] : null; S.enVoiceName = i >= 0 ? enVoices[i].name : "none"; };
+$("enRate").oninput = e => { S.enRate = +e.target.value; $("enRateV").textContent = S.enRate.toFixed(2)+"배"; };
 $("rate").oninput = e => { S.rate = +e.target.value; $("rateV").textContent = S.rate.toFixed(2)+"배"; };
 $("pitch").oninput = e => { S.pitch = +e.target.value; $("pitchV").textContent = S.pitch.toFixed(2); };
 $("secs").oninput = e => { S.secs = Math.max(3, Math.min(60, +e.target.value || 10)); };
@@ -916,6 +922,7 @@ $("resetUpload").onclick = () => {
 
 loadPrefs();
 $("rate").value = S.rate; $("pitch").value = S.pitch; $("secs").value = S.secs;
+$("enRate").value = S.enRate; $("enRateV").textContent = S.enRate.toFixed(2)+"배";
 $("rateV").textContent = S.rate.toFixed(2)+"배"; $("pitchV").textContent = S.pitch.toFixed(2);
 $("beepVol").value = S.beep; $("beepV").textContent = Math.round(S.beep*100)+"%";
 $("sfxVol").value = S.sfx; $("sfxV").textContent = Math.round(S.sfx*100)+"%";
