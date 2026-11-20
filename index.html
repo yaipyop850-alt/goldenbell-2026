@@ -598,6 +598,8 @@ function answerParts(q){
   let ex = (q.explanation||"").trim();
   if (ex && !/[.!?。]$|[다요죠]$/.test(ex)) ex += "입니다.";
   const ans = sayOX(q.answer).trim();
+  const isOX = ["O","X"].includes(String(q.answer).trim().toUpperCase());
+  if (isOX) return { head: `${ans}!`, tail: "입니다.", ex, ox: true };      // "정답은 / 오!!! / 입니다"
   const head = /([다요자어죠])[.!?]?$|[.!?]$/.test(ans) ? ans.replace(/[.!?]?$/, "!") : `${ans}입니다!`;
   return { head, ex };
 }
@@ -734,7 +736,13 @@ async function goReveal(){
   setMain(qi < QUESTIONS.length-1 ? "다음 문제 ▶" : "마지막 문제 · 1번으로");
   // "정답은" (보통) → "엑스입니다!" (높고 빠르게) → 해설 (보통)
   const rid = run, full = answerSpeech(q), ap = answerParts(q);
-  await ment("정답은", ap.head, rid, voiceFor(q));
+  if (ap.ox){
+    await speak("정답은", { ment: true, voice: S.voice });
+    if (rid !== run) return;
+    await speak(ap.head, { ment: true, voice: S.voice, pitchMul: 1.6, rateMul: 1.0 / S.rate });   // 오!/엑스! 크게 힘주어
+    if (rid !== run) return;
+    await speak(ap.tail, { ment: true, voice: S.voice });
+  } else await ment("정답은", ap.head, rid, voiceFor(q));
   if (rid !== run) return;
   if (ap.ex) await speak(ap.ex, { voice: voiceFor(q), ment: true });
   lastSpeech = full; lastVoice = voiceFor(q);
@@ -1163,11 +1171,11 @@ function openEnding(){
   $("ending").classList.remove("hide");
   const a = sndEl.ending;
   if (a && S.sfx > 0){ try{ a.currentTime = 0; a.volume = S.sfx * 0.9; a.play().catch(()=>{}); }catch(e){} }
-  // 음악 먼저 → 2초 뒤 "축하합니다!"와 종이 조각
+  // 음악 먼저 → 4초 뒤 "축하합니다!"와 종이 조각
   const e = $("ending"); e.classList.remove("go"); cancelAnimationFrame(confT);
   const c = $("confetti"); c.getContext("2d").clearRect(0, 0, c.width, c.height);
   clearTimeout(endShowT);
-  endShowT = setTimeout(() => { if (e.classList.contains("hide")) return; e.classList.add("go"); startConfetti(); }, 2000);
+  endShowT = setTimeout(() => { if (e.classList.contains("hide")) return; e.classList.add("go"); startConfetti(); }, 4000);
 }
 let endShowT = null;
 function closeEnding(){
