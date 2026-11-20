@@ -484,6 +484,27 @@ function splitLang(t, multi){
   return out.filter(x => x.t.replace(/[\s,.'"“”‘’]/g,"").length);
 }
 let speakToken = 0;
+// 여러 토막을 한꺼번에 대기열에 넣어 토막 사이 틈을 줄임: segs = [{t, pitchMul, rateMul, voice}]
+function speakSegs(segs){
+  return new Promise(resolve => {
+    if (!synth){ resolve(); return; }
+    synth.cancel(); ++speakToken;
+    segs = segs.filter(x => x.t && x.t.trim());
+    let done = false;
+    const finish = () => { if (!done){ done = true; clearTimeout(safety); setSpeaking(false); resolve(); } };
+    const safety = setTimeout(finish, 4000 + segs.reduce((n, x) => n + x.t.length * 300, 0));
+    currentUtter = [];
+    segs.forEach((x, i) => {
+      const u = new SpeechSynthesisUtterance(sayFix(x.t));
+      const v = x.voice || S.voice; if (v) u.voice = v; u.lang = "ko-KR";
+      u.rate = S.rate * (x.rateMul || 1); u.pitch = Math.min(2, S.pitch * (x.pitchMul || 1));
+      if (i === segs.length - 1){ u.onend = finish; u.onerror = finish; }
+      currentUtter.push(u); synth.speak(u);
+    });
+    if (!segs.length) finish();
+    setSpeaking(true);
+  });
+}
 function speak(text, opts = {}){
   return new Promise(resolve=>{
     if (!opts.ment){ lastSpeech = text; lastVoice = opts.voice || null; }   // 진행 멘트는 '다시 읽기' 대상에서 제외
@@ -662,9 +683,7 @@ function goIdle(){
 // 진행 멘트: 앞부분은 보통, 뒷부분은 높고 빠르게 (시험 페이지에서 고른 값: 높낮이 1.45, 속도 1.10, 쉼 0)
 const MENT = { pitch: 1.45, rate: 1.10 };
 async function ment(front, back, id, backVoice){
-  await speak(front, { ment: true, voice: S.voice });
-  if (!back || (id !== undefined && !alive(id))) return;
-  await speak(back, { ment: true, voice: backVoice || S.voice, pitchMul: MENT.pitch, rateMul: MENT.rate / S.rate });
+  await speakSegs([{ t: front }, { t: back, voice: backVoice, pitchMul: MENT.pitch, rateMul: MENT.rate / S.rate }]);
 }
 // 문제를 읽은 뒤 공통: "정답을 써주세요" → 효과음 → 카운트다운
 async function afterRead(id){
@@ -737,11 +756,8 @@ async function goReveal(){
   // "정답은" (보통) → "엑스입니다!" (높고 빠르게) → 해설 (보통)
   const rid = run, full = answerSpeech(q), ap = answerParts(q);
   if (ap.ox){
-    await speak("정답은", { ment: true, voice: S.voice });
-    if (rid !== run) return;
-    await speak(ap.head, { ment: true, voice: S.voice, pitchMul: 1.6, rateMul: 1.0 / S.rate });   // 오!/엑스! 크게 힘주어
-    if (rid !== run) return;
-    await speak(ap.tail, { ment: true, voice: S.voice });
+    // 정답은 / 오! (크게) / 입니다 — 세 토막을 한꺼번에 넣어 틈을 줄임
+    await speakSegs([{ t: "정답은" }, { t: ap.head, pitchMul: 1.6, rateMul: 1.0 / S.rate }, { t: ap.tail }]);
   } else await ment("정답은", ap.head, rid, voiceFor(q));
   if (rid !== run) return;
   if (ap.ex) await speak(ap.ex, { voice: voiceFor(q), ment: true });
