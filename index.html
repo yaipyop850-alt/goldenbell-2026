@@ -129,6 +129,18 @@
   body.reveal .answer{font-size:clamp(28px,3.6vh,44px);letter-spacing:.3em}
   body.reveal .answer b{line-height:1.05;margin:.1em 0 .15em;letter-spacing:0}
   body.reveal .expl{font-size:clamp(22px,3.4vh,40px);color:var(--muted);max-width:1500px}
+  .edge-note{margin-top:16px;font-size:14px;line-height:1.5;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;text-align:left}
+  .edge-note.ewarn{color:#ffe2a3;background:#3b2a12;border:1px solid var(--gold-d);border-radius:10px;padding:10px 12px}
+  /* 종료(우승) 화면 */
+  #ending{position:fixed;inset:0;z-index:60;background:radial-gradient(ellipse at center,#24603f 0%,#0f2a1d 75%);display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:default}
+  #ending.hide{display:none}
+  #ending canvas{position:absolute;inset:0;width:100%;height:100%}
+  #ending h1{position:relative;margin:0;font-size:min(17vw,30vh);font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(242,193,78,.55),0 6px 0 #8a5a00;animation:cheer 1.2s cubic-bezier(.2,1.5,.4,1) both;letter-spacing:.02em}
+  #ending .sub{position:relative;margin-top:2vh;font-size:min(4vw,5vh);color:#fff;opacity:.9;animation:rise 1s .6s both}
+  #ending .etip{position:absolute;right:14px;bottom:10px;color:rgba(255,255,255,.2);font-size:12px}
+  @keyframes cheer{from{opacity:0;transform:scale(.3) rotate(-6deg)}to{opacity:1;transform:none}}
+  footer .sub-btn.end{border-color:var(--gold-d);color:var(--gold)}
+  footer .sub-btn.end.arm{background:var(--gold);color:#1a1405}
 </style>
 </head>
 <body>
@@ -139,7 +151,14 @@
     <input type="password" id="gatePw" autocomplete="off">
     <div class="msg" id="gateMsg"></div>
     <button class="main-btn" type="submit" id="gateBtn">입장</button>
+    <div class="edge-note" id="edgeNote">ⓘ 문제 읽기 목소리가 제대로 나오려면 <b>Microsoft Edge</b> 브라우저로 접속해 주세요.</div>
   </form>
+</div>
+<div id="ending" class="hide">
+  <canvas id="confetti"></canvas>
+  <h1>축하합니다!</h1>
+  <div class="sub">2026 도전! 골든벨</div>
+  <div class="etip">Esc: 진행 화면으로 돌아가기</div>
 </div>
 <div id="introV" class="hide">
   <div id="introCount"></div>
@@ -173,6 +192,7 @@
   <button class="main-btn" id="mainBtn" title="→">▶ AI가 문제 읽기</button>
   <button class="sub-btn" id="jumpBtn">🔢 문항 이동</button>
   <button class="sub-btn rev" id="revBtn">🔥 패자부활전</button>
+  <button class="sub-btn end" id="endBtn" tabindex="-1">🏆 종료</button>
   <button class="sub-btn" id="resetBtn">⟲ 1번으로</button>
   <button class="sub-btn" id="openImport">📋 문항</button>
   <button class="sub-btn" id="openSettings">⚙ 소리</button>
@@ -505,7 +525,7 @@ function tick(n){           // n = 남은 초
 const sndEl = {}, sndOK = {};
 let SOUND_PLAIN = null;
 function setSounds(map){
-  for (const k of ["intro","write","timeup","raise"]){
+  for (const k of ["intro","write","timeup","raise","ending"]){
     if (!map[k]) continue;
     const a = new Audio(URL.createObjectURL(new Blob([b64(map[k])], {type:"audio/mp4"})));
     a.preload = "auto"; sndEl[k] = a;
@@ -513,6 +533,7 @@ function setSounds(map){
     a.load();
   }
   if (sndEl.intro) sndEl.intro.loop = true;
+  if (sndEl.ending) sndEl.ending.loop = true;
 }
 async function loadSounds(pw){
   try{
@@ -728,6 +749,7 @@ function leaveTitle(){
 }
 $("title").onclick = leaveTitle;
 document.addEventListener("keydown", e=>{
+  if (!$("ending").classList.contains("hide")){ e.preventDefault(); if (e.key === "Escape") closeEnding(); return; }
   if (introActive){ if (["Escape","ArrowRight","PageDown"].includes(e.key)){ e.preventDefault(); endIntro(); } else if (e.key===" ") e.preventDefault(); return; }
   // 히든 메뉴: Ctrl + Shift + P (문항을 연 뒤에만)
   if (e.ctrlKey && e.shiftKey && (e.key==="P"||e.key==="p"||e.code==="KeyP")){ e.preventDefault(); if (PLAIN) openPwMenu(); return; }
@@ -1001,6 +1023,63 @@ function fitAnswer(){
   fit();
 }
 window.addEventListener('resize', () => { if (document.body.classList.contains('reveal')) fitAnswer(); });
+
+/* ---------- Edge 안내 ---------- */
+if (!/Edg\//.test(navigator.userAgent)){
+  const n = $("edgeNote"); n.classList.add("ewarn");
+  n.innerHTML = "⚠ 지금은 Edge가 아닌 브라우저입니다. 문제 읽기 목소리가 나오지 않거나 다를 수 있으니 <b>Microsoft Edge</b>로 다시 접속해 주세요.";
+}
+
+/* ---------- 종료(우승자 결정): 마우스로만, 두 번 눌러 확정 ---------- */
+let endArmT = null;
+$("endBtn").addEventListener("click", e => {
+  if (e.detail === 0) return;                 // 키보드로 눌린 클릭은 무시
+  const b = $("endBtn");
+  if (!b.classList.contains("arm")){
+    b.classList.add("arm"); b.textContent = "🏆 한 번 더 누르면 종료";
+    clearTimeout(endArmT); endArmT = setTimeout(()=>{ b.classList.remove("arm"); b.textContent = "🏆 종료"; }, 3000);
+    return;
+  }
+  clearTimeout(endArmT); b.classList.remove("arm"); b.textContent = "🏆 종료";
+  openEnding();
+});
+let confT = null, parts = [];
+function openEnding(){
+  run++; clearInterval(timer); if (synth) synth.cancel(); stopSfx(); introFade();
+  $("ending").classList.remove("hide");
+  const a = sndEl.ending;
+  if (a && S.sfx > 0){ try{ a.currentTime = 0; a.volume = S.sfx * 0.9; a.play().catch(()=>{}); }catch(e){} }
+  startConfetti();
+}
+function closeEnding(){
+  $("ending").classList.add("hide"); cancelAnimationFrame(confT);
+  const a = sndEl.ending; if (a){ try{ a.pause(); }catch(e){} }
+  goIdle();
+}
+function startConfetti(){
+  const c = $("confetti"), x = c.getContext("2d");
+  const W = c.width = innerWidth * devicePixelRatio, H = c.height = innerHeight * devicePixelRatio;
+  const cols = ["#f2c14e","#ffe27a","#ff7a6b","#7fd6ff","#9be7b5","#ffffff","#ff9bd2"];
+  parts = Array.from({length: 220}, () => newP(W, H, cols, true));
+  const tick = () => {
+    x.clearRect(0, 0, W, H);
+    for (const p of parts){
+      p.x += p.vx; p.y += p.vy; p.vy += 0.02 * devicePixelRatio; p.r += p.vr; p.vx += Math.sin(p.y / 60) * 0.03;
+      if (p.y > H + 20) Object.assign(p, newP(W, H, cols, false));
+      x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c;
+      if (p.round){ x.beginPath(); x.arc(0, 0, p.s/2, 0, 6.3); x.fill(); }
+      else x.fillRect(-p.s/2, -p.s/4, p.s, p.s/2 * Math.abs(Math.cos(p.r * 2)) + 1);
+      x.restore();
+    }
+    confT = requestAnimationFrame(tick);
+  };
+  cancelAnimationFrame(confT); tick();
+}
+function newP(W, H, cols, first){
+  const d = devicePixelRatio;
+  return { x: Math.random() * W, y: first ? Math.random() * H - H : -20, vx: (Math.random() - .5) * 1.5 * d, vy: (1 + Math.random() * 2) * d,
+    r: Math.random() * 6, vr: (Math.random() - .5) * .15, s: (7 + Math.random() * 9) * d, c: cols[(Math.random() * cols.length) | 0], round: Math.random() < .25 };
+}
 
 loadQuestionFile();
 </script>
