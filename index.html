@@ -187,6 +187,10 @@
       <select id="voiceSel"></select>
     </div>
     <div class="row">
+      <label>영어 문장을 읽을 목소리 <span id="enCount"></span></label>
+      <select id="enVoiceSel"></select>
+    </div>
+    <div class="row">
       <label>읽기 속도 <span id="rateV"></span></label>
       <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.9">
     </div>
@@ -343,8 +347,8 @@ const $ = id => document.getElementById(id);
 const S = { voice: null, rate: 0.9, pitch: 1, secs: 10, beep: 0.6, sfx: 0.8 };
 
 /* ---------- 설정 저장(브라우저별) ---------- */
-function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx}); S.voiceName = p.voiceName; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,voiceName:S.voice&&S.voice.name})); }catch(e){} }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx}); S.enVoiceName = p.enVoiceName; S.voiceName = p.voiceName; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,enVoiceName:(S.enVoice?S.enVoice.name:(S.enVoiceName||"")),voiceName:S.voice&&S.voice.name})); }catch(e){} }
 
 /* ---------- 음성 ---------- */
 const synth = window.speechSynthesis;
@@ -376,27 +380,74 @@ function loadVoices(){
   else if (!voices.length){ warn.style.display="block"; warn.textContent="한국어 목소리를 찾지 못했습니다. Edge로 열었는지, 인터넷이 연결되어 있는지 확인해 주세요."; }
   else if (!voices.some(v=>/natural/i.test(v.name))){ warn.style.display="block"; warn.textContent="고품질(Natural) 목소리가 보이지 않습니다. Edge 브라우저 + 인터넷 연결 상태에서 다시 열면 나타납니다."; }
   else warn.style.display="none";
+  // 영어 목소리 (Natural 우선, 미국 영어 우선). 첫 항목 = 사용 안 함
+  enVoices = synth.getVoices().filter(v => /^en/i.test(v.lang))
+    .sort((a,b)=> (/natural/i.test(b.name)-/natural/i.test(a.name)) || (/en-US/i.test(b.lang)-/en-US/i.test(a.lang)));
+  const es = $("enVoiceSel"); es.innerHTML = '<option value="-1">사용 안 함 (한국어 목소리로 읽기)</option>';
+  enVoices.forEach((v,i)=>{ const o = document.createElement("option"); o.value = i;
+    o.textContent = v.name.replace(/ - English.*$/,"") + (/natural/i.test(v.name) ? "  ★고품질" : ""); es.appendChild(o); });
+  $("enCount").textContent = enVoices.length ? `영어 ${enVoices.length}개` : "(영어 목소리 없음)";
+  let ep = S.enVoiceName === "none" ? -1 : enVoices.findIndex(v => v.name === S.enVoiceName);
+  if (ep < 0 && S.enVoiceName !== "none") ep = enVoices.length ? 0 : -1;
+  es.value = ep; S.enVoice = ep >= 0 ? enVoices[ep] : null;
 }
+let enVoices = [];
 if (synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
 
+/* ---------- 읽기 전 다듬기 ---------- */
+// ①②… → "1번", 조사에 맞춰 "1번은/1번이/1번을"
+// 한글 바로 뒤 괄호 속 영어·한자 → 소리로는 생략 (호크아이(Hawk-Eye) → 호크아이)
+const CIRC = "①②③④⑤⑥⑦⑧⑨⑩";
+function sayFix(t){
+  t = t.replace(/([가-힣]['’"”]?)\s*\((?=[^)]*[A-Za-z一-鿿Ѐ-ӿ])[^)]*\)/g, "$1");
+  t = t.replace(/(\d)\s*km\b/g, "$1킬로미터").replace(/(\d)\s*cm\b/g, "$1센티미터").replace(/(\d)\s*kg\b/g, "$1킬로그램");
+  t = t.replace(/([①-⑩])(\s*)(은|는|이|가|을|를|과|와|의|로|으로)?/g, (m, c, sp, j) => {
+    const n = CIRC.indexOf(c) + 1;
+    if (!j) return ` ${n}번, `;
+    const jj = {"는":"은","가":"이","를":"을","와":"과","로":"으로"}[j] || j;
+    return ` ${n}번${jj}`;
+  });
+  return t.replace(/\s+,/g, ",").replace(/[ \t]{2,}/g, " ");
+}
+// 영어 구간을 나눔: 영어 목소리가 있으면 영어 구간만 영어 목소리로
+function splitLang(t){
+  if (!S.enVoice) return [{ t, en:false }];
+  const out = [], re = /[A-Za-z][A-Za-z'’\-]*(?:[ ,.!?;:]+[A-Za-z][A-Za-z'’\-]*)*[.!?]?/g;
+  let last = 0, m;
+  while ((m = re.exec(t))){
+    if (m[0].replace(/[^A-Za-z]/g,"").length < 2){ continue; }   // 한 글자 영어(O, X 등)는 한국어로
+    if (m.index > last) out.push({ t: t.slice(last, m.index), en:false });
+    out.push({ t: m[0], en:true }); last = m.index + m[0].length;
+  }
+  if (last < t.length) out.push({ t: t.slice(last), en:false });
+  return out.filter(x => x.t.replace(/[\s,.'"“”‘’]/g,"").length);
+}
+let speakToken = 0;
 function speak(text, opts = {}){
   return new Promise(resolve=>{
     if (!opts.ment) lastSpeech = text;     // 진행 멘트는 '다시 읽기' 대상에서 제외
     if (!synth){ resolve(); return; }
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    if (S.voice) u.voice = S.voice;
-    u.lang = "ko-KR";
-    u.rate = S.rate * (opts.rateMul || 1);
-    u.pitch = Math.min(2, S.pitch * (opts.pitchMul || 1));
+    const my = ++speakToken;
+    const parts = splitLang(sayFix(text));
+    const rate = S.rate * (opts.rateMul || 1), pitch = Math.min(2, S.pitch * (opts.pitchMul || 1));
     let done = false;
     const finish = () => { if (!done){ done = true; clearTimeout(safety); setSpeaking(false); resolve(); } };
     // onend가 안 오는 브라우저 버그 대비 안전 타이머
-    const safety = setTimeout(finish, Math.max(4000, text.length * 260 / u.rate));
-    u.onend = finish; u.onerror = finish;
-    currentUtter = u; // 가비지 컬렉션으로 onend가 사라지는 문제 방지
+    const safety = setTimeout(finish, Math.max(4000, text.length * 280 / rate + parts.length * 400));
+    currentUtter = [];   // 가비지 컬렉션으로 onend가 사라지는 문제 방지
+    parts.forEach((p, i) => {
+      const u = new SpeechSynthesisUtterance(p.t);
+      if (p.en){ u.voice = S.enVoice; u.lang = S.enVoice.lang; }
+      else { if (S.voice) u.voice = S.voice; u.lang = "ko-KR"; }
+      u.rate = rate; u.pitch = pitch;
+      if (i === parts.length - 1){ u.onend = finish; u.onerror = finish; }
+      else u.onerror = () => { if (my !== speakToken) finish(); };
+      currentUtter.push(u);
+      synth.speak(u);
+    });
+    if (!parts.length) finish();
     setSpeaking(true);
-    synth.speak(u);
   });
 }
 function setSpeaking(on){
@@ -684,6 +735,7 @@ function closeSettings(){ $("settings").classList.remove("open"); savePrefs(); $
 $("openSettings").onclick = openSettings;
 $("closeSettings").onclick = closeSettings;
 $("voiceSel").onchange = e => { S.voice = voices[+e.target.value]; };
+$("enVoiceSel").onchange = e => { const i = +e.target.value; S.enVoice = i >= 0 ? enVoices[i] : null; S.enVoiceName = i >= 0 ? enVoices[i].name : "none"; };
 $("rate").oninput = e => { S.rate = +e.target.value; $("rateV").textContent = S.rate.toFixed(2)+"배"; };
 $("pitch").oninput = e => { S.pitch = +e.target.value; $("pitchV").textContent = S.pitch.toFixed(2); };
 $("secs").oninput = e => { S.secs = Math.max(3, Math.min(60, +e.target.value || 10)); };
