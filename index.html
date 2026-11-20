@@ -400,7 +400,7 @@ if (synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
 const CIRC = "①②③④⑤⑥⑦⑧⑨⑩";
 function sayFix(t){
   t = t.replace(/([가-힣]['’"”]?)\s*\((?=[^)]*[A-Za-z一-鿿Ѐ-ӿ])[^)]*\)/g, "$1");
-  t = t.replace(/(\d)\s*km\b/g, "$1킬로미터").replace(/(\d)\s*cm\b/g, "$1센티미터").replace(/(\d)\s*kg\b/g, "$1킬로그램");
+  t = t.replace(/([\d만천억])\s*km\b/g, "$1 킬로미터").replace(/([\d만천억])\s*cm\b/g, "$1 센티미터").replace(/([\d만천억])\s*kg\b/g, "$1 킬로그램");
   t = t.replace(/([①-⑩])(\s*)(은|는|이|가|을|를|과|와|의|로|으로)?/g, (m, c, sp, j) => {
     const n = CIRC.indexOf(c) + 1;
     if (!j) return ` ${n}번, `;
