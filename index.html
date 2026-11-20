@@ -682,6 +682,7 @@ function goIdle(){
 }
 // 진행 멘트: 앞부분은 보통, 뒷부분은 높고 빠르게 (시험 페이지에서 고른 값: 높낮이 1.45, 속도 1.10, 쉼 0)
 const MENT = { pitch: 1.45, rate: 1.10 };
+const OXP = { pitch: 1.3, rate: 1.0 };   // OX 정답 한 문장 읽기 톤
 async function ment(front, back, id, backVoice){
   await speakSegs([{ t: front }, { t: back, voice: backVoice, pitchMul: MENT.pitch, rateMul: MENT.rate / S.rate }]);
 }
@@ -756,8 +757,8 @@ async function goReveal(){
   // "정답은" (보통) → "엑스입니다!" (높고 빠르게) → 해설 (보통)
   const rid = run, full = answerSpeech(q), ap = answerParts(q);
   if (ap.ox){
-    // 정답은 / 오! (크게) / 입니다 — 세 토막을 한꺼번에 넣어 틈을 줄임
-    await speakSegs([{ t: "정답은" }, { t: ap.head, pitchMul: 1.6, rateMul: 1.0 / S.rate }, { t: ap.tail }]);
+    // 토막으로 나누면 고품질 음성은 토막마다 틈이 생겨, 한 문장으로 읽되 전체 톤을 올리고 느낌표로 힘을 줌
+    await speakSegs([{ t: `정답은, ${ap.head} ${ap.tail}`, pitchMul: OXP.pitch, rateMul: OXP.rate / S.rate }]);
   } else await ment("정답은", ap.head, rid, voiceFor(q));
   if (rid !== run) return;
   if (ap.ex) await speak(ap.ex, { voice: voiceFor(q), ment: true });
