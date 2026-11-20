@@ -423,9 +423,9 @@ function sayFix(t){
   t = t.replace(/([\d만천억])\s*km\b/g, "$1 킬로미터").replace(/([\d만천억])\s*cm\b/g, "$1 센티미터").replace(/([\d만천억])\s*kg\b/g, "$1 킬로그램");
   t = t.replace(/([①-⑩])(\s*)(은|는|이|가|을|를|과|와|의|로|으로)?/g, (m, c, sp, j) => {
     const n = CIRC.indexOf(c) + 1;
-    if (!j) return ` ${n}번, `;
+    if (!j) return ` ${hanNum(n)}번, `;
     const jj = {"는":"은","가":"이","를":"을","와":"과","로":"으로"}[j] || j;
-    return ` ${n}번${jj}`;
+    return ` ${hanNum(n)}번${jj}`;
   });
   t = t.replace(/\s*[·・‧∙]\s*/g, ", ");          // 가운뎃점 → 쉼
   return t.replace(/\s+,/g, ",").replace(/,\s*,/g, ",").replace(/[ \t]{2,}/g, " ");
