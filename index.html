@@ -123,6 +123,12 @@
   .drop:hover,.drop.over{border-color:var(--gold);color:var(--text)}
   .hid{background:#5b4a12;color:#ffe2a3;border-radius:4px;padding:0 3px}
   .sheet-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+  /* 정답 공개: 문제를 숨기고 정답을 화면 가득 */
+  body.reveal #content > div:first-child, body.reveal #question{display:none !important}
+  body.reveal .stage{min-height:0;flex:1}
+  body.reveal .answer{font-size:clamp(28px,3.6vh,44px);letter-spacing:.3em}
+  body.reveal .answer b{line-height:1.05;margin:.1em 0 .15em;letter-spacing:0}
+  body.reveal .expl{font-size:clamp(22px,3.4vh,40px);color:var(--muted);max-width:1500px}
 </style>
 </head>
 <body>
@@ -520,6 +526,7 @@ function ringHTML(n, total){
 let run = 0;                       // 단계가 바뀌면 진행 중이던 음성·효과음 흐름을 끊기 위한 번호
 const alive = id => id === run;
 function goIdle(){
+  document.body.classList.remove('reveal');
   run++; clearInterval(timer); if (synth) synth.cancel(); stopSfx();
   state = "idle"; renderQuestion();
   $("question").style.visibility = "hidden";
@@ -582,6 +589,7 @@ async function goCall(){
   await sfx("raise");
 }
 async function goReveal(){
+  document.body.classList.add('reveal'); setTimeout(fitAnswer, 0);
   run++; stopSfx();
   state = "reveal";
   const q = QUESTIONS[qi];
@@ -903,6 +911,17 @@ $("pwMake").onclick = async () => {
     ? '<b>questions.enc.json</b>, <b>sound.enc.json</b> 두 파일을 내려받았습니다. GitHub에 함께 올려 기존 파일을 교체해 주세요.'
     : '<b>questions.enc.json</b> 파일을 내려받았습니다. GitHub에 올려 기존 파일을 교체해 주세요.';
 };
+
+// 정답 글자를 화면 폭 92%·높이 66% 안에서 가장 크게
+function fitAnswer(){
+  const b = document.querySelector('.answer b'); if (!b) return;
+  b.className = ''; b.style.whiteSpace = 'nowrap';
+  let f = Math.min(innerHeight*0.62, 520); b.style.fontSize = f+'px';
+  while ((b.scrollWidth > innerWidth*0.92 || b.offsetHeight > innerHeight*0.66) && f > 40){ f -= 4; b.style.fontSize = f+'px'; }
+  if (f <= 40) b.style.whiteSpace = 'normal';
+  fit();
+}
+window.addEventListener('resize', () => { if (document.body.classList.contains('reveal')) fitAnswer(); });
 
 loadQuestionFile();
 </script>
