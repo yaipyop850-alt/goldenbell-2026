@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>멘트 목소리 시험</title>
+<style>
+  body{margin:0;background:#173d2d;color:#f6f8f4;font-family:"Malgun Gothic","Noto Sans KR",sans-serif;display:flex;justify-content:center}
+  .wrap{width:min(720px,94vw);padding:28px 0 40px}
+  h1{font-size:24px;margin:0 0 6px;color:#f2c14e}
+  p.note{color:#a8c6b6;font-size:14px;margin:0 0 18px;line-height:1.6}
+  .row{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+  select{flex:1;font-size:15px;padding:9px;border-radius:10px;background:#0f2a1d;color:#fff;border:1px solid #2f6049;font-family:inherit}
+  .card{background:#1f4a38;border:1px solid #2f6049;border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+  .card b{display:block;font-size:17px}
+  .card small{color:#a8c6b6;font-size:13px}
+  .card .t{flex:1}
+  button{background:#f2c14e;color:#1a1405;border:none;border-radius:10px;padding:10px 18px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}
+  button:hover{background:#ffd56e}
+  label{font-size:14px;color:#a8c6b6;width:110px}
+  input[type=range]{flex:1;accent-color:#f2c14e}
+  .warn{background:#3b2a12;border:1px solid #c9971f;color:#ffe2a3;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:14px;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎤 "정답을 써주세요!" 멘트 시험</h1>
+  <p class="note">Microsoft Edge에서 여세요. 각 버튼을 눌러 비교해 보시고, 마음에 드는 번호를 알려 주세요.<br>맨 아래에서 높낮이·속도를 직접 바꿔 볼 수도 있습니다.</p>
+  <div class="warn" id="warn"></div>
+  <div class="row"><select id="voice"></select></div>
+
+  <div class="card"><div class="t"><b>A. 지금 방식</b><small>한 번에, 조금 높게</small></div><button data-v="A">▶ 듣기</button></div>
+  <div class="card"><div class="t"><b>B. 끊어 읽기</b><small>"정답을…" (쉼) "써주세요!" — 뒤를 높고 빠르게</small></div><button data-v="B">▶ 듣기</button></div>
+  <div class="card"><div class="t"><b>C. 낮게 시작 → 높게 끝</b><small>"정답을"은 낮고 느리게, "써주세요!"는 크게 치고 올라감</small></div><button data-v="C">▶ 듣기</button></div>
+  <div class="card"><div class="t"><b>D. 사회자 느낌</b><small>"자! 여러분," (쉼) "정답을 써주세요!"</small></div><button data-v="D">▶ 듣기</button></div>
+  <div class="card"><div class="t"><b>E. 짧고 강하게</b><small>"정답!" (쉼) "써주세요!" — 둘 다 높고 빠르게</small></div><button data-v="E">▶ 듣기</button></div>
+
+  <div class="card" style="flex-direction:column;align-items:stretch">
+    <b>직접 조절 (B 방식 기준)</b>
+    <div class="row" style="margin-top:10px"><label>뒷부분 높낮이 <span id="pv"></span></label><input type="range" id="p" min="0.8" max="2" step="0.05" value="1.3"></div>
+    <div class="row"><label>뒷부분 속도 <span id="rv"></span></label><input type="range" id="r" min="0.7" max="1.6" step="0.05" value="1.1"></div>
+    <div class="row"><label>쉼 길이 <span id="gv"></span></label><input type="range" id="g" min="0" max="1000" step="50" value="350"></div>
+    <div style="text-align:right"><button data-v="X">▶ 이 설정으로 듣기</button></div>
+  </div>
+</div>
+<script>
+const synth = window.speechSynthesis, $ = id => document.getElementById(id);
+let voices = [];
+function load(){
+  voices = synth.getVoices().filter(v => /^ko/i.test(v.lang))
+    .sort((a,b)=> (/natural/i.test(b.name)-/natural/i.test(a.name)) || (/sunhi|선희/i.test(b.name)-/sunhi|선희/i.test(a.name)));
+  $("voice").innerHTML = voices.map((v,i)=>`<option value="${i}">${v.name.replace(/ - Korean \(Korea\)/,"")}</option>`).join("");
+  const w = $("warn");
+  if (!voices.length){ w.style.display="block"; w.textContent="한국어 목소리를 찾지 못했습니다. Microsoft Edge로 열었는지, 인터넷이 연결되어 있는지 확인해 주세요."; }
+  else if (!/Edg\//.test(navigator.userAgent)){ w.style.display="block"; w.textContent="Edge가 아닌 브라우저입니다. 대회에서 쓸 목소리와 다를 수 있습니다."; }
+  else w.style.display="none";
+}
+load(); synth.onvoiceschanged = load;
+const wait = ms => new Promise(r=>setTimeout(r, ms));
+function say(text, pitch=1, rate=0.9){
+  return new Promise(res=>{
+    const u = new SpeechSynthesisUtterance(text);
+    const v = voices[+$("voice").value]; if (v) u.voice = v;
+    u.lang = "ko-KR"; u.pitch = pitch; u.rate = rate;
+    const t = setTimeout(res, 6000); u.onend = u.onerror = () => { clearTimeout(t); res(); };
+    synth.speak(u);
+  });
+}
+const V = {
+  A: async()=>{ await say("정답을 써주세요!", 1.05, 0.9); },
+  B: async()=>{ await say("정답을", 1.0, 0.9); await wait(350); await say("써주세요!", 1.3, 1.1); },
+  C: async()=>{ await say("정답을", 0.85, 0.8); await wait(250); await say("써주세요!", 1.45, 1.2); },
+  D: async()=>{ await say("자! 여러분,", 1.15, 1.0); await wait(300); await say("정답을 써주세요!", 1.25, 1.05); },
+  E: async()=>{ await say("정답!", 1.35, 1.1); await wait(250); await say("써주세요!", 1.4, 1.2); },
+  X: async()=>{ await say("정답을", 1.0, 0.9); await wait(+$("g").value); await say("써주세요!", +$("p").value, +$("r").value); },
+};
+document.querySelectorAll("button[data-v]").forEach(b => b.onclick = () => { synth.cancel(); V[b.dataset.v](); });
+const lab = () => { $("pv").textContent = (+$("p").value).toFixed(2); $("rv").textContent = (+$("r").value).toFixed(2); $("gv").textContent = $("g").value+"ms"; };
+["p","r","g"].forEach(id => $(id).oninput = lab); lab();
+</script>
+</body>
+</html>
