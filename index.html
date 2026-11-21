@@ -26,6 +26,10 @@
   .tag.ox{color:var(--gold);border-color:var(--gold-d)}
   .qno{font-size:clamp(30px,3.6vw,52px);font-weight:800;color:var(--gold)}
   .question{font-size:clamp(38px,5.6vw,92px);font-weight:700;line-height:1.45;max-width:1500px;word-break:keep-all;white-space:pre-line}
+  #qimg{display:block;margin:10px auto 0;max-width:min(92%,1100px);max-height:56vh;width:auto;height:auto;object-fit:contain;border-radius:18px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  body.imgonly .question{display:none}
+  body.imgonly #qimg{max-height:62vh}
+  body.reveal #qimg{display:none !important}
   .question.m{font-size:clamp(32px,4.5vw,74px)}
   .question.l{font-size:clamp(28px,3.6vw,60px);line-height:1.45}
   .hidden-chip{display:inline-block;border:2px dashed var(--gold-d);color:var(--gold);border-radius:12px;padding:0 .5em;font-size:.8em}
@@ -190,6 +194,7 @@
     <div class="meta" id="meta"></div>
   </div>
   <div class="question" id="question" style="visibility:hidden"></div>
+  <img id="qimg" alt="" style="display:none">
   <div class="stage" id="stage"></div>
 </div></main>
 
@@ -647,6 +652,9 @@ function renderQuestion(){
   $("question").innerHTML = esc(q.question).replace(/\[\[(.*?)\]\]/gs, `<span class="hidden-chip">🔊 소리로만 들려 드립니다</span>`);
   const len = q.question.length;
   $("question").className = "question" + (len > 130 ? " l" : len > 70 ? " m" : "");
+  // 그림 문제
+  const qi_ = $("qimg"); document.body.classList.toggle("imgonly", !!(q.image && q.imageOnly));
+  if (q.image){ qi_.src = q.image; qi_.style.display = ""; qi_.onload = fit; } else { qi_.removeAttribute("src"); qi_.style.display = "none"; }
   fit();
 }
 function setStage(html){ $("stage").innerHTML = html; fit(); }
@@ -675,7 +683,7 @@ function goIdle(){
   document.body.classList.remove('reveal');
   run++; clearInterval(timer); if (synth) synth.cancel(); stopSfx();
   state = "idle"; renderQuestion();
-  $("question").style.visibility = "hidden";
+  $("question").style.visibility = "hidden"; $("qimg").style.visibility = "hidden";
   setStage(`<div class="speaking" style="visibility:hidden"><span class="dot"></span>읽는 중</div>`);
   setMain("▶ AI가 문제 읽기");
   $("manualBtn").style.display = "";
@@ -705,7 +713,7 @@ function goManual(){        // 사람이 직접 읽는 경우: 문제 낭독만 
   const id = ++run;
   state = "reading";
   lastSpeech = questionSpeech(QUESTIONS[qi], qi+1); lastVoice = voiceFor(QUESTIONS[qi]);
-  $("question").style.visibility = "visible";
+  $("question").style.visibility = "visible"; $("qimg").style.visibility = "visible";
   $("manualBtn").style.display = "none";
   afterRead(id);
 }
@@ -713,7 +721,7 @@ async function goReading(){
   const id = ++run;
   state = "reading";
   $("manualBtn").style.display = "none";
-  $("question").style.visibility = "visible";
+  $("question").style.visibility = "visible"; $("qimg").style.visibility = "visible";
   setStage(`<div class="speaking"><span class="dot"></span>문제를 읽고 있습니다</div>`);
   setMain("읽는 중…", true);
   await speak(questionSpeech(QUESTIONS[qi], qi+1), { voice: voiceFor(QUESTIONS[qi]) });
@@ -934,7 +942,11 @@ function buildQuestions(rows){
         instrOK = true;
       }
     }
-    return { subject:get(r,col.subject), field:get(r,col.field), type, question, answer, explanation, revival, instr, instrOK, repeat, errs };
+    // 그림 문제: 지시 칸에 "그림: 파일경로" → 문제 아래에 그림 표시, "글 숨김/그림만"이면 글자는 소리로만 읽고 화면에는 그림만
+    let image = "", imageOnly = false;
+    const im = instr.match(/그림\s*[:：]\s*([^\s,;·]+)/);
+    if (im){ image = im[1]; instrOK = true; imageOnly = /(그림만|글[^,;·]*(숨|표시하지|안\s*보|보이지))/.test(instr); }
+    return { subject:get(r,col.subject), field:get(r,col.field), type, question, answer, explanation, revival, instr, instrOK, repeat, image, imageOnly, errs };
   });
 }
 let pending = [];
