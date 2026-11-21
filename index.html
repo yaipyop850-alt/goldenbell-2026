@@ -61,6 +61,16 @@
   /* 비밀번호 */
   #gate{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;align-items:center;justify-content:center}
   #gate.hide{display:none}
+  #netWarn{position:fixed;top:10px;right:12px;z-index:60;background:#b9411f;color:#fff;font-weight:700;font-size:15px;padding:7px 14px;border-radius:999px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  #netWarn.show{display:block}
+  #sndState{position:fixed;bottom:10px;left:12px;z-index:30;font-size:13px;padding:4px 11px;border-radius:999px;background:rgba(0,0,0,.35);color:#cfe;pointer-events:none;transition:opacity .6s}
+  #sndState.loading{color:#ffe27a}
+  #sndState.fail{background:#b9411f;color:#fff;font-weight:700}
+  #sndState.done{background:#1f6b45;color:#fff}
+  #sndState.ok{opacity:0}
+  #hostCap{display:none;margin:0 auto;max-width:90%;font-size:clamp(16px,1.6vw,24px);color:#cfe9da;background:rgba(0,0,0,.28);border:1px dashed #5f8f78;border-radius:10px;padding:6px 14px;line-height:1.45}
+  #hostCap.show{display:block}
+  body.reveal #hostCap{display:none !important}
   #gate form{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:32px 34px;width:min(420px,90vw);text-align:center}
   #gate h2{margin:0 0 6px;font-size:24px}
   #gate p{margin:0 0 18px;color:var(--muted);font-size:15px}
@@ -166,6 +176,8 @@
     <div class="edge-note" id="edgeNote">ⓘ 문제 읽기 목소리가 제대로 나오려면 <b>Microsoft Edge</b> 브라우저로 접속해 주세요.</div>
   </form>
 </div>
+<div id="netWarn"></div>
+<div id="sndState" class="loading">⏳ 음원 받는 중…</div>
 <div id="ending" class="hide">
   <canvas id="confetti"></canvas>
   <h1>축하합니다!</h1>
@@ -196,6 +208,7 @@
   <div class="question" id="question" style="visibility:hidden"></div>
   <img id="qimg" alt="" style="display:none">
   <div class="stage" id="stage"></div>
+  <div id="hostCap"></div>
 </div></main>
 
 <footer>
@@ -364,6 +377,7 @@ async function unlock(pw){
   else { setAll(list); SOURCE = "문항 파일"; }
   qi = 0; goIdle(); showSource();
   try{ sessionStorage.setItem("gb_pw", pw); }catch(e){}   // 브라우저를 닫으면 사라짐
+  keepAwake();
   $("gate").classList.add("hide");
 }
 async function loadQuestionFile(){
@@ -376,6 +390,13 @@ async function loadQuestionFile(){
   let saved = null; try{ saved = sessionStorage.getItem("gb_pw"); }catch(e){}
   if (saved){ try{ await unlock(saved); return; }catch(e){} }
 }
+/* ---------- 화면 꺼짐·절전 방지 (페이지가 열려 있는 동안) ---------- */
+let wakeLock = null;
+async function keepAwake(){
+  try{ if ("wakeLock" in navigator && !wakeLock){ wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); } }catch(e){}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && CUR_PW) keepAwake(); });
+document.addEventListener("click", () => { if (CUR_PW && !wakeLock) keepAwake(); });
 /* ---------- 본 문제 / 패자부활전 문항 묶음 ---------- */
 let MAIN = [], REV = [], mode = "main", qiMain = 0;
 function setAll(list){
@@ -494,55 +515,75 @@ function splitLang(t, multi){
 }
 let speakToken = 0;
 // 여러 토막을 한꺼번에 대기열에 넣어 토막 사이 틈을 줄임: segs = [{t, pitchMul, rateMul, voice}]
-function speakSegs(segs){
+/* ---------- 실제 낭독 (공통) ----------
+   고품질(Online) 목소리는 인터넷으로 소리를 받아 옴. 연결이 끊기면 오류가 나거나 소리 없이 끝나므로
+   '소리가 시작됐는지(onstart)'를 확인해, 시작되지 않았으면 오프라인 목소리로 처음부터 다시 읽음 */
+const NET = { failUntil: 0 };
+function offlineVoice(){ return voices.find(v => v.localService) || synth.getVoices().find(v => /^ko/i.test(v.lang) && v.localService) || null; }
+function netFailed(){ return Date.now() < NET.failUntil; }
+function setNetFail(on){
+  NET.failUntil = on ? Date.now() + 60000 : 0;     // 1분 동안은 오프라인 목소리, 그 뒤 다시 인터넷 목소리 시도
+  const b = $("netWarn"); if (!b) return;
+  const off = offlineVoice();
+  b.textContent = off ? "⚠ 인터넷 음성 연결 끊김 · 오프라인 목소리로 읽는 중" : "⚠ 인터넷 음성 연결 끊김 · 오프라인 목소리가 없어요. ↓ 직접 읽기로 진행해 주세요";
+  b.classList.toggle("show", !!on);
+}
+function utterAll(list){
   return new Promise(resolve => {
-    if (!synth){ resolve(); return; }
-    synth.cancel(); ++speakToken;
-    segs = segs.filter(x => x.t && x.t.trim());
-    let done = false;
-    const finish = () => { if (!done){ done = true; clearTimeout(safety); setSpeaking(false); resolve(); } };
-    const safety = setTimeout(finish, 4000 + segs.reduce((n, x) => n + x.t.length * 300, 0));
-    currentUtter = [];
-    segs.forEach((x, i) => {
-      const u = new SpeechSynthesisUtterance(sayFix(x.t));
-      const v = x.voice || S.voice; if (v) u.voice = v; u.lang = "ko-KR";
-      u.rate = S.rate * (x.rateMul || 1); u.pitch = Math.min(2, S.pitch * (x.pitchMul || 1));
-      if (i === segs.length - 1){ u.onend = finish; u.onerror = finish; }
+    synth.cancel();
+    const my = ++speakToken;
+    const online = list.some(x => x.voice && !x.voice.localService);
+    const chars = list.reduce((n, x) => n + x.t.length, 0), t0 = Date.now();
+    let done = false, started = false;
+    const finish = ok => { if (done) return; done = true; clearTimeout(safety); clearTimeout(wd); setSpeaking(false); resolve({ ok, my }); };
+    // onend가 안 오는 브라우저 버그 대비 안전 타이머
+    const safety = setTimeout(() => finish(started || !online), Math.max(4000, chars * 300 / (list[0] ? list[0].rate : 1) + list.length * 400));
+    // 인터넷 목소리가 6초 안에 소리를 시작하지 못하면 실패로 봄
+    const wd = online ? setTimeout(() => { if (!started && my === speakToken){ synth.cancel(); finish(false); } }, 6000) : null;
+    // 소리가 났는지: onstart, 또는 글자 수에 비해 충분히 오래 걸렸으면 정상으로 봄
+    const okNow = () => started || !online || (Date.now() - t0) > chars * 50;
+    const cancelled = ev => my !== speakToken || (ev && /interrupted|canceled/.test(ev.error || ""));
+    currentUtter = [];   // 가비지 컬렉션으로 onend가 사라지는 문제 방지
+    list.forEach((x, i) => {
+      const u = new SpeechSynthesisUtterance(x.t);
+      if (x.voice) u.voice = x.voice; u.lang = x.lang || "ko-KR"; u.rate = x.rate; u.pitch = x.pitch;
+      u.onstart = () => { started = true; };
+      u.onerror = ev => { if (cancelled(ev)) finish(true); else finish(false); };
+      if (i === list.length - 1) u.onend = () => finish(okNow());
       currentUtter.push(u); synth.speak(u);
     });
-    if (!segs.length) finish();
+    if (!list.length) finish(true);
     setSpeaking(true);
   });
 }
+// list를 읽고, 인터넷 목소리가 실패하면 오프라인 목소리로 전체를 한 번 더
+async function playList(list){
+  const off = offlineVoice();
+  const toOffline = l => off ? [{ t: l.map(x => x.t).join(" "), voice: off, lang: "ko-KR", rate: l[0] ? l[0].rate : S.rate, pitch: l[0] ? l[0].pitch : S.pitch }] : [];
+  if (netFailed()){ await utterAll(toOffline(list)); return; }
+  const r = await utterAll(list);
+  if (r.ok){ if (list.some(x => x.voice && !x.voice.localService)) setNetFail(false); return; }
+  if (r.my !== speakToken) return;          // 그 사이 다른 단계로 넘어감
+  setNetFail(true);
+  if (off) await utterAll(toOffline(list));
+}
+function speakSegs(segs){
+  if (!synth) return Promise.resolve();
+  segs = segs.filter(x => x.t && x.t.trim());
+  return playList(segs.map(x => ({ t: sayFix(x.t), voice: x.voice || S.voice, lang: "ko-KR",
+    rate: S.rate * (x.rateMul || 1), pitch: Math.min(2, S.pitch * (x.pitchMul || 1)) })));
+}
 function speak(text, opts = {}){
-  return new Promise(resolve=>{
-    if (!opts.ment){ lastSpeech = text; lastVoice = opts.voice || null; }   // 진행 멘트는 '다시 읽기' 대상에서 제외
-    if (!synth){ resolve(); return; }
-    synth.cancel();
-    const my = ++speakToken;
-    const vMain = opts.voice || S.voice;
-    const multi = !!(vMain && /multilingual/i.test(vMain.name));  // 다국어 목소리: 목소리는 그대로, 영어 문장만 영어 속도로
-    const parts = splitLang(sayFix(text), multi);
-    const rate = S.rate * (opts.rateMul || 1), pitch = Math.min(2, S.pitch * (opts.pitchMul || 1));
-    let done = false;
-    const finish = () => { if (!done){ done = true; clearTimeout(safety); setSpeaking(false); resolve(); } };
-    // onend가 안 오는 브라우저 버그 대비 안전 타이머
-    const safety = setTimeout(finish, Math.max(4000, text.length * 280 / rate + parts.length * 400));
-    currentUtter = [];   // 가비지 컬렉션으로 onend가 사라지는 문제 방지
-    parts.forEach((p, i) => {
-      const u = new SpeechSynthesisUtterance(p.t);
-      // 영어 구간: 다국어 목소리(현수)면 같은 목소리, 아니면 영어 목소리 — 속도는 '영어 읽기 속도'
-      if (p.en){ const ev = multi ? vMain : S.enVoice; u.voice = ev; u.lang = multi ? "en-US" : ev.lang; }
-      else { if (vMain) u.voice = vMain; u.lang = "ko-KR"; }
-      u.rate = p.en ? S.enRate * (opts.rateMul || 1) : rate; u.pitch = pitch;
-      if (i === parts.length - 1){ u.onend = finish; u.onerror = finish; }
-      else u.onerror = () => { if (my !== speakToken) finish(); };
-      currentUtter.push(u);
-      synth.speak(u);
-    });
-    if (!parts.length) finish();
-    setSpeaking(true);
-  });
+  if (!opts.ment){ lastSpeech = text; lastVoice = opts.voice || null; }   // 진행 멘트는 '다시 읽기' 대상에서 제외
+  if (!synth) return Promise.resolve();
+  const vMain = opts.voice || S.voice;
+  const multi = !!(vMain && /multilingual/i.test(vMain.name));  // 다국어 목소리: 목소리는 그대로, 영어 문장만 영어 속도로
+  const parts = splitLang(sayFix(text), multi);
+  const rate = S.rate * (opts.rateMul || 1), pitch = Math.min(2, S.pitch * (opts.pitchMul || 1));
+  return playList(parts.map(p => p.en
+    // 영어 구간: 다국어 목소리(현수)면 같은 목소리, 아니면 영어 목소리 — 속도는 '영어 읽기 속도'
+    ? { t: p.t, voice: multi ? vMain : S.enVoice, lang: multi ? "en-US" : (S.enVoice ? S.enVoice.lang : "en-US"), rate: S.enRate * (opts.rateMul || 1), pitch }
+    : { t: p.t, voice: vMain, lang: "ko-KR", rate, pitch }));
 }
 function setSpeaking(on){
   const el = document.querySelector(".speaking");
@@ -586,13 +627,28 @@ function setSounds(map){
   if (sndEl.intro) sndEl.intro.loop = true;
   if (sndEl.ending) sndEl.ending.loop = true;
 }
+function sndStatus(kind, text){
+  const el = $("sndState"); if (!el) return;
+  el.className = kind; el.textContent = text;
+  if (kind === "done") setTimeout(() => { if (el.className === "done") el.className = "ok"; }, 5000);
+}
+const waitAudio = a => new Promise(res => { if (a.readyState >= 4) return res(); const t = setTimeout(res, 20000);
+  a.addEventListener("canplaythrough", () => { clearTimeout(t); res(); }, { once: true }); a.addEventListener("error", () => { clearTimeout(t); res(); }, { once: true }); });
 async function loadSounds(pw){
+  sndStatus("loading", "⏳ 음원 받는 중… (효과음·배경음악)");
   try{
     const res = await fetch("sound.enc.json?v=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) return;
+    if (!res.ok){ sndStatus("fail", "⚠ 음원을 받지 못했습니다 · 새로고침(Ctrl+F5) 해 주세요"); return; }
     const text = await decryptWith(await res.json(), pw);
     SOUND_PLAIN = text; setSounds(JSON.parse(text));
-  }catch(e){}
+    sndStatus("loading", "⏳ 음원 준비 중…");
+    // 배경음악은 미리 풀어 둠 (오디오 장치는 첫 클릭 때 깨어남)
+    try{ if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+    await Promise.all([...Object.values(sndEl).map(waitAudio), ...["read","check","move"].map(bgmBuffer)]);
+    const miss = ["write","timeup","raise"].filter(k => !sndOK[k]).length + ["read","check","move"].filter(k => bgmRaw[k] && !bgmBuf[k]).length;
+    if (miss) sndStatus("fail", `⚠ 음원 ${miss}개를 불러오지 못했습니다 · 새로고침(Ctrl+F5) 해 주세요`);
+    else sndStatus("done", "✔ 음원 준비 완료");
+  }catch(e){ sndStatus("fail", "⚠ 음원을 불러오지 못했습니다 · 새로고침(Ctrl+F5) 해 주세요"); }
 }
 // 효과음 파일 앞부분의 무음(초) — 멘트가 끝나자마자 소리가 나도록 건너뜀
 const SFX_START = { write: 0.09, raise: 0.07, timeup: 0.13 };
@@ -693,6 +749,7 @@ function renderQuestion(){
   const len = q.question.length;
   $("question").className = "question" + (len > 130 ? " l" : len > 70 ? " m" : "");
   // 그림 문제
+  $("hostCap").classList.remove("show");
   const qi_ = $("qimg"); document.body.classList.toggle("imgonly", !!(q.image && q.imageOnly));
   if (q.image){ qi_.src = q.image; qi_.style.display = ""; qi_.onload = fit; } else { qi_.removeAttribute("src"); qi_.style.display = "none"; }
   fit();
@@ -756,6 +813,9 @@ function goManual(){        // 사람이 직접 읽는 경우: 문제 낭독만 
   lastSpeech = questionSpeech(QUESTIONS[qi], qi+1); lastVoice = voiceFor(QUESTIONS[qi]);
   $("question").style.visibility = "visible"; $("qimg").style.visibility = "visible";
   $("manualBtn").style.display = "none";
+  // 그림만 보이는 문제를 사회자가 직접 읽을 때: 화면 아래에 문제 글을 작게 표시
+  const q = QUESTIONS[qi];
+  if (q.image && q.imageOnly){ $("hostCap").textContent = "🎤 사회자용: " + q.question.replace(/\[\[(.*?)\]\]/gs, "$1"); $("hostCap").classList.add("show"); fit(); }
   afterRead(id);
 }
 async function goReading(){
