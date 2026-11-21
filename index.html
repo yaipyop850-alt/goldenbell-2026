@@ -246,8 +246,12 @@
       <input type="range" id="beepVol" min="0" max="1" step="0.05" value="0.6">
     </div>
     <div class="row">
-      <label>BGM · 효과음 크기 <span id="sfxV"></span></label>
+      <label>오프닝·종료 음악, 효과음 크기 <span id="sfxV"></span></label>
       <input type="range" id="sfxVol" min="0" max="1" step="0.05" value="0.8">
+    </div>
+    <div class="row">
+      <label><span>진행 배경음악 크기 <small style="opacity:.7">(문제 읽기·정답판 확인·이동)</small></span><span id="bgmV"></span></label>
+      <input type="range" id="bgmVol" min="0" max="1" step="0.05" value="0.5">
     </div>
     <div class="row">
       <label>답 쓰는 시간 (초)</label>
@@ -397,11 +401,11 @@ function showSource(){ const el = document.getElementById("srcInfo"); if (el) el
 // idle → reading → countdown → call(정답판 대기) → reveal
 let qi = 0, state = "idle", timer = null, remain = 0, lastSpeech = "", lastVoice = null;
 const $ = id => document.getElementById(id);
-const S = { voice: null, rate: 0.9, enRate: 0.9, pitch: 1, secs: 10, beep: 0.6, sfx: 0.8 };
+const S = { voice: null, rate: 0.9, enRate: 0.9, pitch: 1, secs: 10, beep: 0.6, sfx: 0.8, bgm: 0.5 };
 
 /* ---------- 설정 저장(브라우저별) ---------- */
-function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx, enRate:p.enRate??S.enRate, humanMent:!!p.humanMent}); S.enVoiceName = p.enVoiceName; S.mlVoiceName = p.mlVoiceName; S.voiceName = p.voiceName; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,enRate:S.enRate,humanMent:!!S.humanMent,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,enVoiceName:(S.enVoice?S.enVoice.name:(S.enVoiceName||"")),mlVoiceName:(S.mlVoice?S.mlVoice.name:(S.mlVoiceName||"")),voiceName:S.voice&&S.voice.name})); }catch(e){} }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem("gb_prefs")||"{}"); Object.assign(S, {rate:p.rate??S.rate, pitch:p.pitch??S.pitch, secs:p.secs??S.secs, beep:p.beep??S.beep, sfx:p.sfx??S.sfx, bgm:p.bgm??S.bgm, enRate:p.enRate??S.enRate, humanMent:!!p.humanMent}); S.enVoiceName = p.enVoiceName; S.mlVoiceName = p.mlVoiceName; S.voiceName = p.voiceName; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem("gb_prefs", JSON.stringify({rate:S.rate,enRate:S.enRate,humanMent:!!S.humanMent,pitch:S.pitch,secs:S.secs,beep:S.beep,sfx:S.sfx,bgm:S.bgm,enVoiceName:(S.enVoice?S.enVoice.name:(S.enVoiceName||"")),mlVoiceName:(S.mlVoice?S.mlVoice.name:(S.mlVoiceName||"")),voiceName:S.voice&&S.voice.name})); }catch(e){} }
 
 /* ---------- 음성 ---------- */
 const synth = window.speechSynthesis;
@@ -578,6 +582,7 @@ function setSounds(map){
     a.addEventListener("canplaythrough", ()=>{ sndOK[k] = true; }); a.addEventListener("error", ()=>{ sndOK[k] = false; });
     a.load();
   }
+  for (const k of ["read","check","move"]) if (map["bgm_" + k]) bgmRaw[k] = map["bgm_" + k];
   if (sndEl.intro) sndEl.intro.loop = true;
   if (sndEl.ending) sndEl.ending.loop = true;
 }
@@ -600,7 +605,40 @@ function sfx(name){            // 끝날 때까지 기다리는 효과음
     try{ a.pause(); a.currentTime = SFX_START[name] || 0; a.volume = S.sfx; const pr = a.play(); if (pr) pr.catch(fin); }catch(e){ fin(); }
   });
 }
-function stopSfx(){ ["write","timeup","raise"].forEach(k=>{ const a = sndEl[k]; if (a){ a.onended = null; try{ a.pause(); }catch(e){} } }); }
+function stopSfx(){ ["write","timeup","raise"].forEach(k=>{ const a = sndEl[k]; if (a){ a.onended = null; try{ a.pause(); }catch(e){} } }); bgmStop(); }
+/* ---------- 진행 배경음악 (Web Audio로 끊김 없이 반복) ----------
+   bgm_read : 문제 읽는 동안 (목소리를 가리지 않게 작게)
+   bgm_check: 정답판을 든 뒤 ~ 정답 공개 전 (MC 멘트용)
+   bgm_move : 해설이 끝난 뒤 ~ 다음 문제 (탈락 학생 이동) */
+const BGM_MIX = { read: 0.35, check: 0.8, move: 0.9 };
+const bgmRaw = {}, bgmBuf = {};
+let bgmNow = null;     // { name, src, gain }
+async function bgmBuffer(name){
+  if (bgmBuf[name]) return bgmBuf[name];
+  if (!bgmRaw[name] || !actx) return null;
+  try{ const u8 = b64(bgmRaw[name]); bgmBuf[name] = await actx.decodeAudioData(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength)); }catch(e){ bgmBuf[name] = null; }
+  return bgmBuf[name];
+}
+async function bgmPlay(name, id){
+  audioUnlock();
+  if (bgmNow && bgmNow.name === name) return;
+  bgmStop(0.3);
+  if (S.bgm <= 0) return;
+  const buf = await bgmBuffer(name);
+  if (!buf || (id !== undefined && id !== run)) return;   // 그 사이 단계가 바뀌었으면 틀지 않음
+  if (bgmNow && bgmNow.name === name) return;
+  const src = actx.createBufferSource(), gain = actx.createGain(), t = actx.currentTime;
+  src.buffer = buf; src.loop = true;
+  gain.gain.setValueAtTime(0.0001, t); gain.gain.linearRampToValueAtTime(S.bgm * BGM_MIX[name], t + 0.25);
+  src.connect(gain).connect(actx.destination); src.start(t);
+  bgmNow = { name, src, gain };
+}
+function bgmStop(fade = 0.5){
+  const b = bgmNow; if (!b) return; bgmNow = null;
+  try{ const t = actx.currentTime; b.gain.gain.cancelScheduledValues(t); b.gain.gain.setValueAtTime(b.gain.gain.value, t);
+       b.gain.gain.linearRampToValueAtTime(0.0001, t + fade); b.src.stop(t + fade + 0.05); }catch(e){}
+}
+function bgmLevel(){ if (bgmNow && actx){ const t = actx.currentTime; bgmNow.gain.gain.cancelScheduledValues(t); bgmNow.gain.gain.setValueAtTime(S.bgm * BGM_MIX[bgmNow.name], t); } }
 let fadeT = null;
 function introPlay(){ const a = sndEl.intro; if (!a || S.sfx <= 0) return; clearInterval(fadeT); try{ a.currentTime = 0; a.volume = S.sfx * 0.8; a.play().catch(()=>{}); }catch(e){} }
 function introFade(){ const a = sndEl.intro; if (!a || a.paused) return; clearInterval(fadeT);
@@ -694,7 +732,8 @@ function goIdle(){
 const MENT = { pitch: 1.45, rate: 1.10 };
 const OXP = { pitch: 1.3, rate: 1.0 };   // OX 정답 한 문장 읽기 톤
 async function ment(front, back, id, backVoice){
-  await speakSegs([{ t: front }, { t: back, voice: backVoice, pitchMul: MENT.pitch, rateMul: MENT.rate / S.rate }]);
+  // 토막으로 나누면 고품질 음성은 틈이 생기므로 한 문장으로 이어 읽음 (전체를 조금 높은 톤으로)
+  await speakSegs([{ t: `${front} ${back}`, voice: backVoice, pitchMul: OXP.pitch, rateMul: OXP.rate / S.rate }]);
 }
 // 문제를 읽은 뒤 공통: "정답을 써주세요" → 효과음 → 카운트다운
 async function afterRead(id){
@@ -726,8 +765,11 @@ async function goReading(){
   $("question").style.visibility = "visible"; $("qimg").style.visibility = "visible";
   setStage(`<div class="speaking"><span class="dot"></span>문제를 읽고 있습니다</div>`);
   setMain("읽는 중…", true);
+  bgmPlay("read", id);
   await speak(questionSpeech(QUESTIONS[qi], qi+1), { voice: voiceFor(QUESTIONS[qi]) });
-  if (alive(id)) afterRead(id);
+  if (!alive(id)) return;
+  bgmStop(0.4);
+  afterRead(id);
 }
 const OX_SECS = 5; let cdTotal = 10;
 function goCountdown(){
@@ -758,6 +800,7 @@ async function goCall(){
   await ment("정답판을", "들어주세요!", id);
   if (!alive(id)) return;
   await sfx("raise");
+  if (alive(id)) bgmPlay("check", id);
 }
 async function goReveal(){
   document.body.classList.add('reveal'); setTimeout(fitAnswer, 0);
@@ -776,12 +819,13 @@ async function goReveal(){
   if (rid !== run) return;
   if (ap.ex) await speak(ap.ex, { voice: voiceFor(q), ment: true });
   lastSpeech = full; lastVoice = voiceFor(q);
+  if (rid === run && state === "reveal") bgmPlay("move", rid);
 }
 function next(){
   if (state === "idle") goReading();
   else if (state === "countdown") goCall();
   else if (state === "wment"){ afterWriteMent(run); }
-  else if (state === "wraise"){ state = "call"; setMain("✔ 정답 공개"); sfx("raise"); }
+  else if (state === "wraise"){ state = "call"; setMain("✔ 정답 공개"); const id = run; sfx("raise").then(()=>{ if (alive(id) && state === "call") bgmPlay("check", id); }); }
   else if (state === "call") goReveal();
   else if (state === "reveal"){
     if (qi < QUESTIONS.length-1){ qi++; } else { qi = 0; }
@@ -1036,6 +1080,8 @@ $("rate").value = S.rate; $("pitch").value = S.pitch; $("secs").value = S.secs;
 $("enRate").value = S.enRate; $("enRateV").textContent = S.enRate.toFixed(2)+"배";
 $("rateV").textContent = S.rate.toFixed(2)+"배"; $("pitchV").textContent = S.pitch.toFixed(2);
 $("beepVol").value = S.beep; $("beepV").textContent = Math.round(S.beep*100)+"%";
+$("bgmVol").value = S.bgm; $("bgmV").textContent = Math.round(S.bgm*100)+"%";
+$("bgmVol").oninput = e => { S.bgm = +e.target.value; $("bgmV").textContent = Math.round(S.bgm*100)+"%"; bgmLevel(); };
 $("sfxVol").value = S.sfx; $("sfxV").textContent = Math.round(S.sfx*100)+"%";
 $("sfxVol").oninput = e => { S.sfx = +e.target.value; $("sfxV").textContent = Math.round(S.sfx*100)+"%"; if (sndEl.intro && !sndEl.intro.paused) sndEl.intro.volume = S.sfx*0.8; };
 setAll(__initial);
@@ -1054,7 +1100,7 @@ $("gateForm").addEventListener("submit", async e=>{
 let introActive = false, introTimer = null;
 function playIntro(){
   const box = $("introV"), v = $("introVideo"), c = $("introCount");
-  introActive = true; box.classList.remove("hide"); v.style.display = "none"; v.pause();
+  introActive = true; bgmStop(0.2); box.classList.remove("hide"); v.style.display = "none"; v.pause();
   let n = 3;
   const show = () => { c.textContent = n; c.classList.remove("pulse"); void c.offsetWidth; c.classList.add("pulse"); beep(n > 1 ? 660 : 990, 0.12); };
   c.style.display = ""; show();
