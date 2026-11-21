@@ -589,13 +589,15 @@ async function loadSounds(pw){
     SOUND_PLAIN = text; setSounds(JSON.parse(text));
   }catch(e){}
 }
+// 효과음 파일 앞부분의 무음(초) — 멘트가 끝나자마자 소리가 나도록 건너뜀
+const SFX_START = { write: 0.09, raise: 0.07, timeup: 0.13 };
 function sfx(name){            // 끝날 때까지 기다리는 효과음
   return new Promise(resolve=>{
     const a = sndEl[name]; if (!a || S.sfx <= 0) { resolve(); return; }
     let done = false; const fin = () => { if (!done){ done = true; clearTimeout(t); resolve(); } };
     const t = setTimeout(fin, 8000);
     a.onended = fin; a.onerror = fin;
-    try{ a.pause(); a.currentTime = 0; a.volume = S.sfx; const pr = a.play(); if (pr) pr.catch(fin); }catch(e){ fin(); }
+    try{ a.pause(); a.currentTime = SFX_START[name] || 0; a.volume = S.sfx; const pr = a.play(); if (pr) pr.catch(fin); }catch(e){ fin(); }
   });
 }
 function stopSfx(){ ["write","timeup","raise"].forEach(k=>{ const a = sndEl[k]; if (a){ a.onended = null; try{ a.pause(); }catch(e){} } }); }
@@ -727,16 +729,19 @@ async function goReading(){
   await speak(questionSpeech(QUESTIONS[qi], qi+1), { voice: voiceFor(QUESTIONS[qi]) });
   if (alive(id)) afterRead(id);
 }
+const OX_SECS = 5; let cdTotal = 10;
 function goCountdown(){
-  state = "countdown"; remain = S.secs;
-  setStage(ringHTML(remain, S.secs));
+  // OX 문제는 5초만 (설정 시간이 5초보다 짧으면 그 시간)
+  const q0 = QUESTIONS[qi]; cdTotal = (q0 && q0.type === "OX") ? Math.min(OX_SECS, S.secs) : S.secs;
+  state = "countdown"; remain = cdTotal;
+  setStage(ringHTML(remain, cdTotal));
   setMain("⏩ 시간 건너뛰기");
   tick(remain);
   clearInterval(timer);
   timer = setInterval(()=>{
     remain--;
     if (remain <= 0){ clearInterval(timer); goCall(); }
-    else { setStage(ringHTML(remain, S.secs)); tick(remain); }
+    else { setStage(ringHTML(remain, cdTotal)); tick(remain); }
   }, 1000);
 }
 // 카운트다운 끝 → 시간종료 효과음 → "정답판을 들어주세요" → 효과음 → 선생님 신호 대기
@@ -767,7 +772,7 @@ async function goReveal(){
   if (ap.ox){
     // 토막으로 나누면 고품질 음성은 토막마다 틈이 생겨, 한 문장으로 읽되 전체 톤을 올리고 느낌표로 힘을 줌
     await speakSegs([{ t: `정답은, ${ap.head} ${ap.tail}`, pitchMul: OXP.pitch, rateMul: OXP.rate / S.rate }]);
-  } else await ment("정답은", ap.head, rid, voiceFor(q));
+  } else await speakSegs([{ t: `정답은, ${ap.head}`, voice: voiceFor(q), pitchMul: OXP.pitch, rateMul: OXP.rate / S.rate }]);   // 한 문장으로 이어서
   if (rid !== run) return;
   if (ap.ex) await speak(ap.ex, { voice: voiceFor(q), ment: true });
   lastSpeech = full; lastVoice = voiceFor(q);
